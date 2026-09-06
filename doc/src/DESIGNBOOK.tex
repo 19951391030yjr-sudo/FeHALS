@@ -26,7 +26,8 @@
 \usepackage[ruled,vlined]{algorithm2e}
 \usepackage{etoolbox}
 \usepackage{placeins}
-\usepackage{booktabs}  % 三线表支持
+\usepackage{booktabs} 
+\usepackage{gbt7714}
 
 \newcommand{\refSec}[1]{\hyperref[#1]{Section~\ref*{#1}}}
 \newcommand{\refFig}[1]{\hyperref[#1]{Fig.~\ref*{#1}}}
@@ -52,7 +53,7 @@
 
 \shortauthors{7组（王孜悠）}
 \shorttitle{}
-\title[mode=title]{FeHALS：基于Web的3D可视化航路规划与激光仿真系统技术设计书}
+\title[mode=title]{\makecell[c]{FeHALS：基于Web的3D可视化航路规划与激光仿真系统\\\textbf{技术设计书}}}
 
 \Course{GIS设计与开发}
 \Major{测绘工程}
@@ -75,75 +76,9 @@
 \Teacher{陈 动}
 \Teacher{朱 杰}
 
-\author[1]{王 孜悠}[style=chinese, orcid=2310604116]
-\ead{WZYivan}
-\credit{文档编写，思路构建，代码实现，功能验证，项目管理，代码审查，图表绘制}
-
-\author[1]{梅 康凯}[style=chinese, orcid=2310604109]
-\ead{zhangqilinghy}
-\credit{代码实现，系统适配}
-
-\author[1]{唐 如意}[style=chinese, orcid=2310604115]
-\ead{Try6743}
-\credit{代码实现}
-
-\author[1]{杨 杰瑞}[style=chinese, orcid=2310604122]
-\ead{19951391030yjr-sudo}
-\credit{图表绘制}
-
-\author[1]{温 璞}[style=chinese, orcid=2310604117]
-\credit{暂无贡献}
-
-\author[1]{刘 继明}[style=chinese, orcid=2110604112]
-\credit{暂无贡献}
-
-\author[1]{李 英杰}[style=chinese, orcid=2110604106]
-\credit{暂无贡献}
-
-\author[1]{杜 仲宇}[style=chinese, orcid=2310604103]
-\credit{暂无贡献}
-
-\author[1]{施 祺}[style=chinese, orcid=2310604113]
-\credit{暂无贡献}
-
-\author[1]{向 宇鸣}[style=chinese, orcid=2310604118]
-\credit{暂无贡献}
-
-\author[1]{隋 铭明}[style=chinese]
-\fnmark[1]
-\fntext[1]{指导老师}
-\credit{监督指导}
-
-\author[1]{那 嘉明}[style=chinese]
-\fnmark[1]
-\credit{监督指导}
-
-\author[1]{陈 动}[style=chinese]
-\fnmark[1]
-\credit{监督指导}
-
-\author[1]{朱 杰}[style=chinese]
-\fnmark[1]
-\credit{监督指导}
-
-\affiliation[1]{organization={College of Civil Engineering, Nanjing Forestry University},
-  addressline={Longpan Rd.},
-  city={Nanjing},
-  postcode={210037},
-  country={China}}
-
-\begin{abstract}
-  机载激光扫描（Airborne Laser Scanning, ALS）能够直接获取地表及地物的三维离散采样，是数字高程模型生产、森林调查、城市三维建模和灾害监测的重要数据源。真实飞行采集受设备成本、空域、天气和任务风险制约，外业前通过虚拟场景试验航线与扫描参数，可以降低反复试飞的成本。HELIOS++是面向地面、移动、无人机及机载激光扫描的开源仿真框架，支持场景、平台、扫描器和测量任务的组合配置，但其命令行和XML配置方式对初学者存在较高门槛。FeHALS（Frontend of HELIOS++ for Airborne Laser Scanning）以浏览器为操作入口，把三维预览、航点编辑、弓字形航线生成、参数配置、HELIOS++任务执行、实时日志和点云分析串联为完整流程。开放式WebGIS技术便于跨平台访问与后续扩展，浏览器侧利用WebGL和Three.js完成硬件加速三维显示，无需安装专用桌面GIS软件。
-\end{abstract}
-
-\begin{keywords}
-  ALS \sep 航路规划 \sep 三维可视化 \sep B/S架构 \sep HELIOS++
-\end{keywords}
-
 \MakeNJFUTitlePage[UseDocTitle]
-\maketitle
 \tableofcontents
-\hrulefill
+\newpage
 
 \section{背景目的}
 
@@ -256,7 +191,7 @@ FeHALS采用B/S三层架构：Vue 3、Three.js、Pinia和Axios构成表现层；
 Raycaster与$z=0$隐形地面求交：点击添加航点，拖动修改XY，右键或Delete删除，红色球体和折线表示路径，选中航点变黄。拖动时临时禁用相机控制，以25像素平方阈值区分点击和拖动。弓字形航线在矩形内按间距$d$生成，条数为
 
 \begin{equation}
-N = \left| \frac{y_{\max} - y_{\min}}{d} \right| + 1,
+  N = \left| \frac{y_{\max} - y_{\min}}{d} \right| + 1,
 \end{equation}
 
 相邻扫描线的X端点次序交替，形成连续往返路径。
@@ -266,7 +201,7 @@ N = \left| \frac{y_{\max} - y_{\min}}{d} \right| + 1,
 建议高度取场景包围盒并集最高点$z_{\max}$加$20\text{ m}$：
 
 \begin{equation}
-h_{\text{suggest}} = z_{\max} + 20\text{ m}.
+  h_{\text{suggest}} = z_{\max} + 20\text{ m}.
 \end{equation}
 
 UAV速度为$0.5$--$50\text{ m/s}$，高度为$3$--$500\text{ m}$；Airborne速度为$10$--$200\text{ m/s}$，高度为$3$--$5000\text{ m}$。RIEGL VUX-1UAV扫描频率为$10$--$200\text{ Hz}$，扫描半角为$1^\circ$--$165^\circ$，脉冲频率为$50$--$550\text{ kHz}$。后端将航点改写为统一高度的轨迹文件，并把平台、扫描器、轨迹、速度、频率、半角和格式写入survey XML。轨迹生成与配置生成分离，便于复用和排错。
@@ -278,7 +213,7 @@ UAV速度为$0.5$--$50\text{ m/s}$，高度为$3$--$500\text{ m}$；Airborne速�
 LAS/LAZ由laspy读取\citep{laspy}，XYZ分块读取并过滤非法记录。统计包括总点数、XYZ边界、高程均值、标准差、最小/最大、中位数、P5/P95、40组高程直方图，以及存在强度字段时的强度统计。渲染超过一百万点时使用覆盖全文件序列的等间隔索引抽样。前端以BufferGeometry和PointsMaterial绘制，支持固定色、高度色和强度色；归一化为
 
 \begin{equation}
-t = \frac{v - v_{\min}}{\max(v_{\max} - v_{\min}, 1)},
+  t = \frac{v - v_{\min}}{\max(v_{\max} - v_{\min}, 1)},
 \end{equation}
 
 再映射至蓝—青—绿—黄—红色带。抽样仅影响显示，不改变全量统计。
@@ -349,14 +284,14 @@ t = \frac{v - v_{\min}}{\max(v_{\max} - v_{\min}, 1)},
 设点数为$n$、高程为$z_i$，则
 
 \begin{equation}
-\bar{z} = \frac{1}{n}\sum_{i=1}^{n} z_i, \qquad
-\sigma_z = \sqrt{\frac{1}{n}\sum_{i=1}^{n} (z_i - \bar{z})^2}.
+  \bar{z} = \frac{1}{n}\sum_{i=1}^{n} z_i, \qquad
+  \sigma_z = \sqrt{\frac{1}{n}\sum_{i=1}^{n} (z_i - \bar{z})^2}.
 \end{equation}
 
 中位数、P5和P95描述主体分布并降低极端值影响。若$n > m$且$m = 1,000,000$，显示索引可取
 
 \begin{equation}
-i_k = \left\lfloor \frac{k(n-1)}{m-1} \right\rfloor, \quad k = 0, \dots, m-1.
+  i_k = \left\lfloor \frac{k(n-1)}{m-1} \right\rfloor, \quad k = 0, \dots, m-1.
 \end{equation}
 
 该方法简单确定，但并非空间均匀采样；超大点云仍需八叉树、多分辨率或渐进策略\citep{pointCloudRendering,pointCloudTerrain}。
@@ -383,8 +318,7 @@ LAS/LAZ由laspy解析\citep{laspy}，XYZ以文本流读取，NumPy计算统计�
 
 \FloatBarrier
 
-\printcredits
-
+\newpage
 \bibliographystyle{gbt7714-numerical}
 \bibliography{cas-refs}
 
