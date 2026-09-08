@@ -14,6 +14,8 @@ import PointCloudPanel from './components/PointCloudPanel.vue'
 import ModelList from './components/ModelList.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import LogConsole from './components/LogConsole.vue'
+import CoverageHeatmap from './components/CoverageHeatmap.vue'
+
 
 const sceneStore = useSceneStore()
 const waypointStore = useWaypointStore()
@@ -228,27 +230,27 @@ async function loadResult() {
 
 <template>
   <div class="app">
-    <header class="toolbar">
-      <span class="brand">FeHALS</span>
-      <span class="brand-sub">3D 可视化航路规划与激光仿真</span>
-      <div class="toolbar-actions">
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".obj,.gltf,.glb,.stl"
-          style="display: none"
-          @change="onFileChange"
-        />
-        <button class="btn" @click="onPickModel">模型上传</button>
-        <button class="btn" @click="exportTrajectory">导出航迹</button>
-        <button class="btn btn-primary" @click="runSimulation" v-if="simStore.status !== 'running'">执行仿真</button>
-        <button class="btn btn-danger" @click="cancelSimulation" v-if="simStore.status === 'running'">取消</button>
-        <span class="status-badge" :class="'status-' + simStore.status">
-          {{ statusText[simStore.status] || simStore.status }}
-          <template v-if="simStore.status === 'running'"> {{ simStore.progress }}%</template>
-        </span>
-      </div>
-    </header>
+      <header class="toolbar">
+          <span class="brand">FeHALS</span>
+          <span class="brand-sub">3D 可视化航路规划与激光仿真</span>
+          <div class="toolbar-actions">
+              <input ref="fileInput"
+                     type="file"
+                     accept=".obj,.gltf,.glb,.stl"
+                     style="display: none"
+                     @change="onFileChange" />
+              <button class="btn" @click="onPickModel">模型上传</button>
+              <button class="btn" @click="exportTrajectory">导出航迹</button>
+              <button class="btn btn-primary" @click="runSimulation" v-if="simStore.status !== 'running'">执行仿真</button>
+              <button class="btn btn-danger" @click="cancelSimulation" v-if="simStore.status === 'running'">取消</button>
+              <span class="status-badge" :class="'status-' + simStore.status">
+                  {{ statusText[simStore.status] || simStore.status }}
+                  <template v-if="simStore.status === 'running'">
+                      {{ simStore.progress }}%
+                  </template>
+              </span>
+          </div>
+      </header>
 
     <div class="main">
       <div class="scene-area">
@@ -284,5 +286,8 @@ async function loadResult() {
 
     <div class="resizer-h" @mousedown="startConsoleResize"></div>
     <LogConsole class="console" :style="{ height: consoleHeight + 'px' }" />
+
+    <!-- 覆盖度分析模态浮层：触发按钮位于「点云」Tab，浮层挂载于根级，不随 Tab 切换卸载 -->
+    <CoverageHeatmap />
   </div>
 </template>

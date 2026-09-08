@@ -30,6 +30,14 @@ const fmt = (v, d = 2) => (v == null || Number.isNaN(Number(v)) ? '—' : Number
 const fmtInt = (v) => (v == null ? '—' : Number(v).toLocaleString('en-US'))
 const fmtRange = (a, b) => `${fmt(a)} ~ ${fmt(b)}`
 
+// 覆盖度分析：打开 CoverageHeatmap 模态浮层（显示状态由 store 控制）
+const hasPoints = computed(() => !!simStore.result?.points?.length)
+
+function openCoverageAnalysis() {
+  if (!hasPoints.value) return
+  simStore.coverageModalVisible = true
+}
+
 function downloadPointCloud() {
   if (!simStore.taskId) return
   const url = `/api/results/${simStore.taskId}/download`
@@ -123,6 +131,17 @@ function downloadPointCloud() {
         </div>
       </template>
 
+      <div class="section-divider">覆盖度分析</div>
+      <button
+        class="btn"
+        style="width: 100%"
+        :disabled="!hasPoints"
+        @click="openCoverageAnalysis"
+      >
+        覆盖度分析（热力图）
+      </button>
+      <p class="cov-tab-hint">将点云投影到水平网格，计算密度分布并生成热力图</p>
+
       <div class="section-divider">渲染属性</div>
 
       <div class="field">
@@ -167,3 +186,11 @@ function downloadPointCloud() {
     </template>
   </section>
 </template>
+
+<style scoped>
+.cov-tab-hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 6px 0 10px;
+}
+</style>
