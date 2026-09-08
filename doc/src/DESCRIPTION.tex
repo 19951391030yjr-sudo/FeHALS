@@ -61,11 +61,11 @@
 \def\floatpagepagefraction{1}
 \def\textpagefraction{.001}
 
-\shortauthors{7组（王孜悠）}
+\shortauthors{7组}
 \shorttitle{}
 \title [mode = title]{FeHALS：基于Web的3D可视化航路规划与激光仿真系统}
 
-\Course{GIS设计与开发}
+\Course{\enquote{智能+}GIS设计与开发}
 \Major{测绘工程}
 \Grade{2023级}
 \Group{7 组}
@@ -100,7 +100,10 @@
 
 \author[1]{杨 杰瑞}[style=chinese, orcid=2310604122]
 \ead{19951391030yjr-sudo}
-\credit{图表绘制}
+\credit{文档编写, 图表绘制}
+
+\author[1]{杜 仲宇}[style=chinese, orcid=2310604103]
+\credit{文档编写, 图表绘制}
 
 \author[1]{李 英杰}[style=chinese, orcid=2110604106]
 \credit{代码实现, 系统适配}
@@ -109,9 +112,6 @@
 \credit{暂无贡献}
 
 \author[1]{刘 继明}[style=chinese, orcid=2110604112]
-\credit{暂无贡献}
-
-\author[1]{杜 仲宇}[style=chinese, orcid=2310604103]
 \credit{暂无贡献}
 
 \author[1]{施 祺}[style=chinese, orcid=2310604113]
@@ -138,30 +138,30 @@
 \credit{监督指导}
 
 \affiliation[1]{organization={College of Civil Engineering, Nanjing Forestry University},
-  addressline={Longpan Rd.},
-  city={Nanjing},
-  postcode={210037},
-  country={China}}
+    addressline={Longpan Rd.},
+    city={Nanjing},
+    postcode={210037},
+    country={China}}
 
 \begin{abstract}
-  三维激光扫描仿真技术在地理信息、遥感与测绘领域的应用日益广泛。HELIOS++作为一款开源的激光雷达仿真框架，能够高保真地模拟机载、地面与无人机等平台的扫描过程，但其原生交互方式依赖命令行与XML配置文件，缺乏直观的三维可视化航路规划能力，限制了其在复杂场景下的高效使用。本文提出并实现了一个基于Web的FeHALS（Frontend of HELIOS++ for Airborne Laser Scanning）系统。系统采用浏览器/服务器（B/S）架构，前端基于Vue 3与Three.js构建三维交互场景，后端基于FastAPI提供仿真服务并封装HELIOS++引擎调用。系统支持导入多种三维模型，用户可在浏览器三维场景中通过鼠标交互设定航点并自动生成符合HELIOS++格式的航迹文件；同时提供图形化界面配置扫描平台与传感器参数，一键调用仿真引擎并通过WebSocket实时推送运行日志；仿真生成的点云可自动加载至三维场景，并支持按高度、强度着色以及点尺寸与透明度的调节。该系统有效降低了HELIOS++的使用门槛，为航摄方案设计、传感器参数优化及点云数据模拟提供了便捷、高效的可视化工具。本文详细阐述了系统的架构设计、核心功能模块与技术实现路径，并通过典型场景验证了系统的可行性与实用性。源代码已公开至\url{https://github.com/WZYivan/FeHALS}。
+    三维激光扫描仿真技术在地理信息、遥感与测绘领域的应用日益广泛。HELIOS++作为一款开源的激光雷达仿真框架，能够高保真地模拟机载、地面与无人机等平台的扫描过程，但其原生交互方式依赖命令行与XML配置文件，缺乏直观的三维可视化航路规划能力，限制了其在复杂场景下的高效使用。本文提出并实现了一个基于Web的FeHALS（Frontend of HELIOS++ for Airborne Laser Scanning）系统。系统采用浏览器/服务器（B/S）架构，前端基于Vue 3与Three.js构建三维交互场景，后端基于FastAPI提供仿真服务并封装HELIOS++引擎调用。系统支持导入多种三维模型，用户可在浏览器三维场景中通过鼠标交互设定航点并自动生成符合HELIOS++格式的航迹文件；同时提供图形化界面配置扫描平台与传感器参数，一键调用仿真引擎并通过WebSocket实时推送运行日志；仿真生成的点云可自动加载至三维场景，并支持按高度、强度着色以及点尺寸与透明度的调节。该系统有效降低了HELIOS++的使用门槛，为航摄方案设计、传感器参数优化及点云数据模拟提供了便捷、高效的可视化工具。本文详细阐述了系统的架构设计、核心功能模块与技术实现路径，并通过典型场景验证了系统的可行性与实用性。源代码已公开至\url{https://github.com/WZYivan/FeHALS}。
 \end{abstract}
 
 \begin{graphicalabstract}
-  \includegraphics[width=\textwidth]{figs/graphicalabstract.pdf}
+    \includegraphics[width=\textwidth]{figs/graphicalabstract.pdf}
 \end{graphicalabstract}
 
 % Research highlights
 \begin{highlights}
-  \item 设计并实现了基于Web的HELIOS++仿真参数图形化配置界面，自动生成XML配置文件与航迹文件。
-  \item 构建了从场景构建、航路设计、仿真执行到结果渲染的完整闭环工作流，实现了激光仿真全流程的集成化与可视化。
-  \item 系统基于开源技术栈（Vue 3 + Three.js + FastAPI + HELIOS++），前后端解耦，具有良好的可扩展性与跨平台访问能力。
-  \item 使用git+github的本地+云端组合统筹开发流程，深度落实了现代化软件开发协作机制。
+    \item 设计并实现了基于Web的HELIOS++仿真参数图形化配置界面，自动生成XML配置文件与航迹文件。
+    \item 构建了从场景构建、航路设计、仿真执行到结果渲染的完整闭环工作流，实现了激光仿真全流程的集成化与可视化。
+    \item 系统基于开源技术栈（Vue 3 + Three.js + FastAPI + HELIOS++），前后端解耦，具有良好的可扩展性与跨平台访问能力。
+    \item 使用git+github的本地+云端组合统筹开发流程，深度落实了现代化软件开发协作机制。
 \end{highlights}
 
 % Keywords
 \begin{keywords}
-  ALS \sep 航路规划 \sep 三维可视化 \sep B/S架构 \sep HELIOS++
+    ALS \sep 航路规划 \sep 三维可视化 \sep B/S架构 \sep HELIOS++
 \end{keywords}
 
 \MakeNJFUTitlePage[UseDocTitle]
@@ -185,10 +185,10 @@ HELIOS++官方团队已提供了一个基于QGIS的图形化插件AEOS \citep{ae
 本文其余部分组织如下：\refSec{sec:tech}介绍相关技术；\refSec{sec:design}进行系统需求分析与总体设计；第\refSec{sec:impl}阐述系统各模块的设计与实现；\refSec{sec:conclusion}给出结论与展望。
 
 \begin{figure}[pos=!htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figs/fehals_overview.jpg}
-  \caption{FeHALS的Web前端与仿真结果}
-  \label{fig:fehals_overview}
+    \centering
+    \includegraphics[width=\textwidth]{figs/fehals_overview.jpg}
+    \caption{FeHALS的Web前端与仿真结果}
+    \label{fig:fehals_overview}
 \end{figure}
 
 \section{相关技术}\label{sec:tech}
@@ -209,17 +209,17 @@ FastAPI是一个基于Python的高性能Web框架，基于类型注解与Pydanti
 系统采用浏览器/服务器（B/S）架构，分为前端、后端与仿真引擎三层，其总体架构如\refFig{fig:gernal_fehals_arch}所示。前端基于Vue 3构建，负责三维场景渲染、航点交互编辑、参数配置与结果展示，通过HTTP \citep{rfc9110,rfc9113,rfc9114} 与WebSocket与后端通信；后端基于FastAPI，负责接收前端请求，生成HELIOS++所需的航迹文件与XML配置文件，调用HELIOS++可执行文件执行仿真，并解析与返回点云结果；仿真引擎层为HELIOS++，独立于前后端，由后端以子进程方式调用。各模块间通过明确的REST API与WebSocket消息格式进行数据交换，形成“数据导入 $\rightarrow$ 航路规划 $\rightarrow$ 仿真配置 $\rightarrow$ 执行控制 $\rightarrow$ 结果展示 $\rightarrow$ 日志诊断”的工作流，如\refFig{fig:gernal_fehals_workflow}所示。
 
 \begin{figure}[pos=!htbp]
-  \centering
-  \includegraphics[width=0.85\textwidth]{figs/gernal_fehals_arch.pdf}
-  \caption{FeHALS总体架构}
-  \label{fig:gernal_fehals_arch}
+    \centering
+    \includegraphics[width=0.85\textwidth]{figs/gernal_fehals_arch.pdf}
+    \caption{FeHALS总体架构}
+    \label{fig:gernal_fehals_arch}
 \end{figure}
 
 \begin{figure}[pos=!htbp]
-  \centering
-  \includegraphics[width=0.85\textwidth]{figs/gernal_fehals_workflow.pdf}
-  \caption{FeHALS数据流}
-  \label{fig:gernal_fehals_workflow}
+    \centering
+    \includegraphics[width=0.85\textwidth]{figs/gernal_fehals_workflow.pdf}
+    \caption{FeHALS数据流}
+    \label{fig:gernal_fehals_workflow}
 \end{figure}
 
 \subsection{功能优先级划分}
@@ -231,10 +231,10 @@ FastAPI是一个基于Python的高性能Web框架，基于类型注解与Pydanti
 系统实现按前后端分层组织，详细的功能划分如\refFig{fig:detailed_fehals_arch}所示。前端基于Vue 3与Node.js \citep{nodejs} 生态构建，目录下包含组件（components）、状态管理（stores）与组合式函数（composables）三部分：组件层包含三维场景Scene3D.vue、参数配置面板ControlPanel.vue、航点列表WaypointList.vue与日志控制台LogConsole.vue；stores层基于Pinia维护场景（scene）、航点（waypoints）与仿真（simulation）三份响应式状态；composables层封装Three.js场景管理（useThreeScene）、航点交互（useWaypoints）与后端接口调用（useHeliosAPI）。后端基于FastAPI构建，api目录下包含REST路由routes.py与WebSocket端点websocket.py，models目录定义Pydantic数据模型schemas.py，services目录封装航迹生成trajectory\_generator.py、配置生成config\_generator.py、HELIOS++调用helios\_service.py与点云解析pointcloud\_parser.py。
 
 \begin{figure}[pos=!htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figs/detialed_fehals_arch.pdf}
-  \caption{FeHALS详细架构}
-  \label{fig:detailed_fehals_arch}
+    \centering
+    \includegraphics[width=\textwidth]{figs/detialed_fehals_arch.pdf}
+    \caption{FeHALS详细架构}
+    \label{fig:detailed_fehals_arch}
 \end{figure}
 
 \subsection{三维场景渲染与航点交互}
@@ -253,10 +253,10 @@ trajectory\_generator.py将航点数组按添加顺序、以1秒时间间隔生�
 helios\_service.py维护仿真任务注册表，通过asyncio.create\_subprocess\_exec以子进程方式调用helios++可执行文件，指定资源目录（--assets）、输出目录（--output）与输出格式参数，实时捕获其标准输出/错误流并解析进度百分比，经WebSocket推送至前端，同时支持超时终止与任务取消。仿真启动前，前端对全部参数进行范围校验（数据来源于从HELIOS++扫描器目录文件中提取的参数规格库），超出有效范围时拒绝执行并给出提示。仿真结束后，pointcloud\_parser.py利用laspy \citep{laspy} 解析LAS/LAZ点云或按文本方式解析XYZ点云，提取坐标与强度、计算空间范围，并对超过百万级的点云进行降采样。前端将返回的点云坐标构建为BufferGeometry与Points对象，支持按高度（蓝色至红色渐变）、按强度或固定颜色着色，并可实时调节点尺寸与透明度 \citep{pointCloudRendering}。需要说明的是，仅OBJ格式模型参与HELIOS++仿真，GLTF/STL仅用于三维展示；由于本机HELIOS++构建的LAS输出不可用，系统默认采用XYZ输出格式，详细的数据流见\refFig{fig:detailed_fehals_workflow}。
 
 \begin{figure}[pos=!htbp]
-  \centering
-  \includegraphics[width=0.85\textwidth]{figs/detailed_fehals_workflow.pdf}
-  \caption{FeHALS详细数据流}
-  \label{fig:detailed_fehals_workflow}
+    \centering
+    \includegraphics[width=0.85\textwidth]{figs/detailed_fehals_workflow.pdf}
+    \caption{FeHALS详细数据流}
+    \label{fig:detailed_fehals_workflow}
 \end{figure}
 
 \section{结论与展望}\label{sec:conclusion}
@@ -269,9 +269,9 @@ helios\_service.py维护仿真任务注册表，通过asyncio.create\_subprocess
 \section{详细的贡献}\label{app:git}
 
 \begin{figure}[pos=!htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figs/gitgraph.pdf}
-  \caption{基于git历史的详细贡献图，用户名的对应关系见首页脚注}
+    \centering
+    \includegraphics[width=\textwidth]{figs/gitgraph.pdf}
+    \caption{基于git历史的详细贡献图，用户名的对应关系见首页脚注}
 \end{figure}
 
 \FloatBarrier
