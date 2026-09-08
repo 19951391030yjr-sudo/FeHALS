@@ -1,16 +1,16 @@
 <script setup>
 /**
- * 点云覆盖度分析组件：工具栏触发 → 模态浮层 → 选择网格大小 → 分析 → Canvas 热力图 + 统计指标。
+ * 点云覆盖度分析模态浮层组件。
+ * 触发按钮位于「点云」Tab（PointCloudPanel），通过 simStore.coverageModalVisible 控制显示。
  * 数据来源：simStore.result（来自 /api/results/{task_id}）。
  */
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useSimulationStore } from '../stores/simulation'
 import { useHeliosAPI } from '../composables/useHeliosAPI'
 
 const simStore = useSimulationStore()
 const api = useHeliosAPI()
 
-const showModal = ref(false)
 const gridSize = ref(50)
 const analyzing = ref(false)
 const errorMsg = ref('')
@@ -27,21 +27,16 @@ const COLOR_STOPS = [
   [1.0, [200, 30, 30]],
 ]
 
+const showModal = computed({
+  get: () => simStore.coverageModalVisible,
+  set: (v) => { simStore.coverageModalVisible = v },
+})
+
 const hasResult = computed(() => !!simStore.result && simStore.result.points?.length)
 const pointCount = computed(() => simStore.result?.point_count || 0)
 
-function openModal() {
-  errorMsg.value = ''
-  if (!hasResult.value) {
-    errorMsg.value = '请先执行仿真以加载点云'
-    return
-  }
-  showModal.value = true
-  nextTick(() => renderHeatmap())
-}
-
 function closeModal() {
-  showModal.value = false
+  simStore.coverageModalVisible = false
 }
 
 async function runAnalysis() {
@@ -133,20 +128,20 @@ function renderHeatmap() {
 }
 
 watch(
+  () => simStore.coverageModalVisible,
+  (v) => {
+    errorMsg.value = ''
+    if (v) nextTick(renderHeatmap)
+  },
+)
+
+watch(
   () => simStore.coverageResult,
   () => nextTick(renderHeatmap),
 )
-
-onMounted(() => {
-  if (showModal.value) renderHeatmap()
-})
 </script>
 
 <template>
-  <button class="cov-btn" @click="openModal" :disabled="!hasResult">
-    覆盖度分析
-  </button>
-
   <div v-if="showModal" class="cov-modal-mask" @click.self="closeModal">
     <div class="cov-modal">
       <div class="cov-modal-head">
@@ -238,25 +233,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.cov-btn {
-  padding: 6px 14px;
-  border: 1px solid #4b5563;
-  border-radius: 6px;
-  background: #374151;
-  color: #f3f4f6;
-  font-size: 13px;
-  cursor: pointer;
-  margin-right: 8px;
-  transition: background 0.15s;
-}
-.cov-btn:hover:not(:disabled) {
-  background: #4b5563;
-}
-.cov-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .cov-modal-mask {
   position: fixed;
   inset: 0;

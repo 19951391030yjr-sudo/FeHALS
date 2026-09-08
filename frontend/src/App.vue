@@ -233,7 +233,6 @@ async function loadResult() {
       <header class="toolbar">
           <span class="brand">FeHALS</span>
           <span class="brand-sub">3D 可视化航路规划与激光仿真</span>
-          <CoverageHeatmap />
           <div class="toolbar-actions">
               <input ref="fileInput"
                      type="file"
@@ -287,5 +286,8 @@ async function loadResult() {
 
     <div class="resizer-h" @mousedown="startConsoleResize"></div>
     <LogConsole class="console" :style="{ height: consoleHeight + 'px' }" />
+
+    <!-- 覆盖度分析模态浮层：触发按钮位于「点云」Tab，浮层挂载于根级，不随 Tab 切换卸载 -->
+    <CoverageHeatmap />
   </div>
 </template>

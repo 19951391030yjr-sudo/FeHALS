@@ -14,6 +14,7 @@ export const useSimulationStore = defineStore('simulation', {
     // 覆盖度分析结果：{grid, bounds, statistics}
     coverageResult: null,
     coverageAnalyzing: false,
+    coverageModalVisible: false,
     // 仿真参数（与 ControlPanel 表单双向绑定）
     params: {
       platform_type: 'UAV',
@@ -43,6 +44,7 @@ export const useSimulationStore = defineStore('simulation', {
       this.taskId = null
       this.coverageResult = null
       this.coverageAnalyzing = false
+      this.coverageModalVisible = false
     },
   },
 })
