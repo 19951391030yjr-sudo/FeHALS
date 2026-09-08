@@ -13,6 +13,7 @@ import WaypointList from './components/WaypointList.vue'
 import PointCloudPanel from './components/PointCloudPanel.vue'
 import ModelList from './components/ModelList.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import AnimationPanel from './components/AnimationPanel.vue'
 import LogConsole from './components/LogConsole.vue'
 import CoverageHeatmap from './components/CoverageHeatmap.vue'
 
@@ -221,7 +222,7 @@ async function loadResult() {
   try {
     const res = await api.getResult(simStore.taskId)
     simStore.result = res
-    simStore.addLog('INFO', `点云加载完成：${res.point_count} 个点`)
+    simStore.addLog('INFO', `点云加载完成：${res.point_count} 个点（可在「动画」Tab 或场景底部播放条回放生成过程）`)
   } catch (err) {
     simStore.addLog('ERROR', '结果加载失败：' + (err.response?.data?.detail || err.message))
   }
@@ -263,6 +264,7 @@ async function loadResult() {
           <button :class="{ active: activeTab === 'pointcloud' }" @click="activeTab = 'pointcloud'">点云</button>
           <button :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">模型列表</button>
           <button :class="{ active: activeTab === 'trajectory' }" @click="activeTab = 'trajectory'">航迹</button>
+          <button :class="{ active: activeTab === 'animation' }" @click="activeTab = 'animation'">动画</button>
           <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">设置</button>
         </div>
         <ControlPanel v-if="activeTab === 'params'" />
@@ -280,6 +282,7 @@ async function loadResult() {
           </section>
           <WaypointList />
         </template>
+        <AnimationPanel v-if="activeTab === 'animation'" />
         <SettingsPanel v-if="activeTab === 'settings'" />
       </aside>
     </div>

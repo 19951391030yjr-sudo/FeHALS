@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- 模拟 HELIOS++ 引擎 `backend/tools/mock_helios`：在未安装 HELIOS++ 的机器上按 survey XML 航迹生成扫描顺序 XYZ 点云并输出进度行，遵循 HELIOS_PATH 调用契约，用于联调与演示（含 README 用法说明）
+- 仿真过程动画：平台代理（UAV 四旋翼 / Airborne 固定翼，旋翼自转、机头朝向航段方向）沿规划航迹恒高飞行，配扫描光束锥、地面足迹环与旋转扫描线示意；点云按 HELIOS++ 出点顺序逐步生成（仅改写 geometry.drawRange，零缓冲重建），支持「逐点连续 / 逐条带（按航段）」两种揭示方式
+- 「动画」Tab：播放/暂停/从头播放/停止、倍速（0.5~8×）、循环、仿真完成后自动播放、显示开关（平台/光束锥/足迹/航迹/视角跟随）、平台示意大小倍率、航迹与进度统计（长度/航段/时长/航高/幅宽/已生成点数）
+- 场景底部播放条：播放/暂停、重播、进度拖动、时间/百分比、倍速、已生成点数；按场景宽度（容器查询）逐级隐藏次要读数，保证单行不溢出
+- useThreeScene 新增帧回调机制（onFrame/offFrame，共用渲染循环）、动画对象组 animGroup、点云揭示 API（revealPointCloud/getPointCloudCount），并暴露 controls 供视角跟随
 - HELIOS++ 运行环境检测与诊断：后端 `GET /api/env/diagnose` 接口检测可执行文件存在性/可执行权限/版本探测、资源目录完整性（HELIOS_REPO 子目录、pyhelios 平台/扫描器定义、--assets 搜索路径）、静态工作目录就绪状态；前端设置面板新增「环境诊断」区块，显示整体状态徽章、各检测项明细（含状态图标、路径、错误提示），支持「重新检测」按钮
 - 点云特征统计：结果接口返回全量点统计（点数/平均高度/高度标准差/高度范围，基于降采样前的完整点集），点云 Tab 新增「特征统计」区块（含 XYZ 范围显示）
 - 高度分位数统计（中位数、P5、P95）与强度统计（均值/标准差/范围）
@@ -15,6 +20,7 @@
 - 高度着色渐变抽取为共用模块 colorRamp.js（3D 点云着色与统计直方图共用）
 
 ### Fixed
+- Windows 下仿真子进程无法启动：uvicorn 的 reload 模式在 Windows 会将事件循环切到 Selector 策略，`asyncio.create_subprocess_exec` 在该策略下抛 NotImplementedError；helios_service 改为在独立线程中以同步 subprocess.Popen 拉起引擎并逐行桥接日志/进度，Selector/Proactor 与 Linux/Windows 均适用（取消、超时、进度解析与日志分级行为不变）
 - 结果接口响应补充 stats 字段，修复前端统计面板无数据
 - 页面加载时拉取后端已注册模型，修复刷新后模型列表为空
 - 修复航高自动计算在增删模型后仍显示上一次结果的 bug：模型列表变化时清空建议航高

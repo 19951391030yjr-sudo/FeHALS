@@ -50,3 +50,5 @@
 ## 2026-09-08 
 
 根据隋铭明老师的修改意见首先调整了 [技术设计书](doc/src/DESIGNBOOK.tex) 表格标题的样式。
+
+同日完成了 [TODO](TODO.md) 中的「仿真过程动画」：新增 `stores/animation.js`（播放控制、进度、显示选项与航迹统计）、`composables/useSimAnimation.js`（平台代理、扫描光束锥、地面足迹与旋转扫描线、已飞轨迹，以及点云按 HELIOS++ 出点顺序的逐步揭示）、`components/PlaybackBar.vue`（场景底部播放条）与 `components/AnimationPanel.vue`（「动画」Tab），并在 `useThreeScene.js` 中加入帧回调机制与点云揭示 API。实现要点：点云揭示仅改写 `geometry.drawRange` 而不重建缓冲区，因此可安全地每帧调用；播放状态以 animation store 为唯一真源，三维驱动器每帧读取快照并经回调写回进度，避免双向 watch 造成的状态回环。已用无头浏览器对进度推进、逐点/逐条带揭示、航段朝向、视角跟随、显示开关、清空航点后点云不被遮挡等路径做了运行时验证。

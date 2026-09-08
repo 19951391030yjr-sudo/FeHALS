@@ -2,18 +2,65 @@
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useThreeScene } from '../composables/useThreeScene'
 import { useWaypoints } from '../composables/useWaypoints'
+import { useSimAnimation, swathHalfWidth } from '../composables/useSimAnimation'
 import { useSceneStore } from '../stores/scene'
 import { useWaypointStore } from '../stores/waypoints'
 import { useSimulationStore } from '../stores/simulation'
+import { useAnimationStore } from '../stores/animation'
+import PlaybackBar from './PlaybackBar.vue'
 
 const three = useThreeScene()
 const waypoints = useWaypoints()
+const anim = useSimAnimation()
 const sceneStore = useSceneStore()
 const waypointStore = useWaypointStore()
 const simStore = useSimulationStore()
+const animStore = useAnimationStore()
 
 const container = ref(null)
 const loadedIds = new Set()
+
+// ---------------------------- 仿真动画接线 ----------------------------
+
+// 播放状态快照：动画驱动器每帧读取，天然与 store 保持同步（无需逐项 watch）
+function playbackSnapshot() {
+  return {
+    playing: animStore.playing,
+    progress: animStore.progress,
+    speed: animStore.speed,
+    loop: animStore.loop,
+    duration: animStore.stats.duration,
+    revealMode: animStore.revealMode,
+    showPlatform: animStore.showPlatform,
+    showScanner: animStore.showScanner,
+    showFootprint: animStore.showFootprint,
+    showTrail: animStore.showTrail,
+    followCamera: animStore.followCamera,
+    platformScale: animStore.platformScale,
+    platformType: simStore.params.platform_type,
+    altitude: simStore.params.altitude,
+    scanAngle: simStore.params.scan_angle,
+    pointCount: three.getPointCloudCount(),
+  }
+}
+
+// 航点 + 航高 → 飞行航迹（与后端 .trj 生成规则一致：恒定航高，仅取航点 x、y）
+function rebuildCourse() {
+  const pts = waypointStore.points
+  const altitude = Number(simStore.params.altitude) || 0
+  const speed = Number(simStore.params.speed) > 0 ? Number(simStore.params.speed) : 1
+  const { length, segments } = anim.setCourse(pts, altitude)
+  animStore.ready = pts.length > 0
+  animStore.setStats({
+    pathLength: length,
+    segments,
+    duration: length / speed, // 单倍速播放时长 = 航迹长度 / 飞行速度
+    altitude,
+    swath: swathHalfWidth(altitude, simStore.params.scan_angle),
+    total: three.getPointCloudCount(),
+  })
+  if (!animStore.ready) animStore.reset()
+}
 
 onMounted(() => {
   three.init(container.value)
@@ -24,9 +71,17 @@ onMounted(() => {
     onRemove: (index) => waypointStore.remove(index),
   })
   waypoints.renderWaypoints(waypointStore.points)
+
+  anim.mount({
+    getPlayback: playbackSnapshot,
+    onProgress: (progress, info) =>
+      animStore.updateProgress(progress, info.revealed, info.total, info.finished),
+  })
+  rebuildCourse()
 })
 
 onBeforeUnmount(() => {
+  anim.unmount()
   three.dispose()
 })
 
@@ -34,6 +89,18 @@ onBeforeUnmount(() => {
 watch(
   () => waypointStore.points,
   (points) => waypoints.renderWaypoints(points),
+  { deep: true }
+)
+
+// 航点/航高/速度/扫描角变化 → 重建飞行航迹与动画统计
+watch(
+  () => [
+    waypointStore.points,
+    simStore.params.altitude,
+    simStore.params.speed,
+    simStore.params.scan_angle,
+  ],
+  () => rebuildCourse(),
   { deep: true }
 )
 
@@ -82,15 +149,24 @@ watch(
   { deep: true }
 )
 
-// 仿真结果 → 点云渲染
+// 仿真结果 → 点云渲染 + 动画回放
 watch(
   () => simStore.result,
   (result) => {
-    if (result) three.setPointCloud(result.points, result.intensity, sceneStore.pointOptions)
+    if (!result) return
+    three.setPointCloud(result.points, result.intensity, sceneStore.pointOptions)
+    animStore.setStats({ total: three.getPointCloudCount() })
+    // 自动播放开启时从头演示点云生成过程；否则直接呈现完整点云（进度置 100%）
+    if (animStore.ready && animStore.autoPlay) {
+      animStore.restart()
+    } else {
+      animStore.seek(1)
+      three.revealPointCloud(Infinity)
+    }
   }
 )
 
-// 点云渲染参数 → 实时更新
+// 点云渲染参数 → 实时更新（drawRange 不受影响，动画进度保持不变）
 watch(
   () => sceneStore.pointOptions,
   (opts) => three.updatePointCloud(opts),
@@ -101,6 +177,8 @@ watch(
 <template>
   <div class="scene3d">
     <div ref="container" class="scene-container"></div>
+
+    <PlaybackBar />
 
     <div v-if="sceneStore.loading" class="loading-overlay">
       <div class="spinner"></div>
