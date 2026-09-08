@@ -48,31 +48,47 @@ def generate(waypoints: List[List[float]], altitude: float = 100.0) -> dict:
         '#HEADER: "t", "roll", "pitch", "yaw", "x", "y", "z"',
     ]
 
+    # 目标飞行速度（m/s），用于计算航段间的时间步长
+    # 典型 UAV 巡航速度 5~15 m/s，取 10 m/s 确保扫描线间距合理
+    TARGET_SPEED = 10.0
+
     n = len(waypoints)
     if n == 1:
         # 单个航点，yaw 无意义，设为 0
         x, y = float(waypoints[0][0]), float(waypoints[0][1])
         lines.append(f"0,0,0,0.00,{x:.6f},{y:.6f},{altitude:.6f}")
     else:
+        # 预先计算每段的时间和累积时间
+        cum_t = 0.0
+        seg_times = [0.0]  # seg_times[i] = 航点 i 的时间
+        for i in range(n - 1):
+            dx = float(waypoints[i + 1][0]) - float(waypoints[i][0])
+            dy = float(waypoints[i + 1][1]) - float(waypoints[i][1])
+            dist = math.sqrt(dx * dx + dy * dy)
+            dt = max(1.0, dist / TARGET_SPEED)
+            cum_t += dt
+            seg_times.append(cum_t)
+
         for i in range(n - 1):
             x, y = float(waypoints[i][0]), float(waypoints[i][1])
             next_x, next_y = float(waypoints[i + 1][0]), float(waypoints[i + 1][1])
             yaw = _compute_yaw(x, y, next_x, next_y)
+            t = seg_times[i]
 
             if i > 0:
                 # 中间航点：先写上一段方向的结束行，再写本段方向的起始行
                 # 两行在同一时间戳，实现瞬时转向
                 prev_x, prev_y = float(waypoints[i - 1][0]), float(waypoints[i - 1][1])
                 incoming_yaw = _compute_yaw(prev_x, prev_y, x, y)
-                lines.append(f"{i},0,0,{incoming_yaw:.2f},{x:.6f},{y:.6f},{altitude:.6f}")
+                lines.append(f"{t:.2f},0,0,{incoming_yaw:.2f},{x:.6f},{y:.6f},{altitude:.6f}")
 
-            lines.append(f"{i},0,0,{yaw:.2f},{x:.6f},{y:.6f},{altitude:.6f}")
+            lines.append(f"{t:.2f},0,0,{yaw:.2f},{x:.6f},{y:.6f},{altitude:.6f}")
 
         # 最后一个航点：沿用上一段的方向
         x, y = float(waypoints[-1][0]), float(waypoints[-1][1])
         prev_x, prev_y = float(waypoints[-2][0]), float(waypoints[-2][1])
         yaw = _compute_yaw(prev_x, prev_y, x, y)
-        lines.append(f"{n - 1},0,0,{yaw:.2f},{x:.6f},{y:.6f},{altitude:.6f}")
+        lines.append(f"{seg_times[-1]:.2f},0,0,{yaw:.2f},{x:.6f},{y:.6f},{altitude:.6f}")
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return {"file_id": file_id, "path": str(path), "point_count": n}
