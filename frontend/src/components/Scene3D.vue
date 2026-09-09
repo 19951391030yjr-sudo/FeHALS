@@ -2,7 +2,7 @@
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useThreeScene } from '../composables/useThreeScene'
 import { useWaypoints } from '../composables/useWaypoints'
-import { useSimAnimation, swathHalfWidth } from '../composables/useSimAnimation'
+import { useSimAnimation } from '../composables/useSimAnimation'
 import { useSceneStore } from '../stores/scene'
 import { useWaypointStore } from '../stores/waypoints'
 import { useSimulationStore } from '../stores/simulation'
@@ -32,14 +32,11 @@ function playbackSnapshot() {
     duration: animStore.stats.duration,
     revealMode: animStore.revealMode,
     showPlatform: animStore.showPlatform,
-    showScanner: animStore.showScanner,
-    showFootprint: animStore.showFootprint,
     showTrail: animStore.showTrail,
     followCamera: animStore.followCamera,
     platformScale: animStore.platformScale,
-    platformType: simStore.params.platform_type,
+    platformType: simStore.params.platform_id,
     altitude: simStore.params.altitude,
-    scanAngle: simStore.params.scan_angle,
     pointCount: three.getPointCloudCount(),
   }
 }
@@ -56,7 +53,6 @@ function rebuildCourse() {
     segments,
     duration: length / speed, // 单倍速播放时长 = 航迹长度 / 飞行速度
     altitude,
-    swath: swathHalfWidth(altitude, simStore.params.scan_angle),
     total: three.getPointCloudCount(),
   })
   if (!animStore.ready) animStore.reset()
@@ -92,13 +88,12 @@ watch(
   { deep: true }
 )
 
-// 航点/航高/速度/扫描角变化 → 重建飞行航迹与动画统计
+// 航点/航高/速度变化 → 重建飞行航迹与动画统计
 watch(
   () => [
     waypointStore.points,
     simStore.params.altitude,
     simStore.params.speed,
-    simStore.params.scan_angle,
   ],
   () => rebuildCourse(),
   { deep: true }

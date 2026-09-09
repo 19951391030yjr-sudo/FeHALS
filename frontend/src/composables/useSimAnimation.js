@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import { useThreeScene } from './useThreeScene'
 
-// 仿真过程动画：平台代理沿规划航迹飞行，点云按 HELIOS++ 出点顺序逐步生成。
+// 仿真过程动画：平台代理按 HELIOS++ 平台类型运动（旋翼/固定翼沿航迹飞行、车载贴地行驶、
+// TLS 三脚架原地静态），点云按出点顺序逐步生成。
 //
 // 分层约定（与既有代码一致）：
 //   - 本模块只管三维对象与每帧更新，不直接依赖 Pinia store；
@@ -20,12 +21,6 @@ export function useSimAnimation() {
   return singleton
 }
 
-// 扫描幅宽半宽 (m)：航高 × tan(扫描半角)。供航迹统计与面板展示使用。
-export function swathHalfWidth(altitude, scanAngleDeg) {
-  const a = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(Number(scanAngleDeg) || 0, 0, 89))
-  return Math.max(0, Number(altitude) || 0) * Math.tan(a)
-}
-
 const COLOR = {
   path: 0x94a3b8, // 规划航迹（暗）
   trail: 0x2563eb, // 已飞轨迹（与 UI 主色一致）
@@ -33,14 +28,11 @@ const COLOR = {
   skin: 0xe2e8f0,
   accent: 0x0ea5e9,
   rotor: 0x1f2937,
-  cone: 0x22d3ee,
-  footprint: 0xf59e0b,
-  beam: 0xfbbf24,
 }
 
-// 扫描线示意摆频（Hz）。真实 scan_freq 为 10~200 Hz，按真实值摆动在 60 fps 下
-// 会严重混叠，故取固定示意摆频，仅表达线扫描器「摆动扫描」这一事实。
-const BEAM_VISUAL_HZ = 0.8
+// TLS 转头示意角速度（rad/s）。真实转速可达数千度/秒，按真实值旋转在 60 fps 下
+// 会严重混叠，故取固定示意角速度，仅表达「转头正在扫描」这一事实。
+const HEAD_VISUAL_RAD_S = 1.2
 // 单帧最大步长（秒）：切走标签页后 RAF 停摆，回来时避免进度瞬移
 const MAX_DT = 0.1
 
@@ -55,14 +47,10 @@ function createSimAnimation() {
     platformKind: null,
     platformScale: 1,
     rotors: [], // [{obj, dir}] 旋翼 spinner（绕世界 Z 自转）
-    // 扫描器示意（线扫描器：扫描面垂直航向，地面投影为横航线段）
-    scanner: null, // 横航 rig：扇面/扫描线/足迹线挂其下，每帧整体定位与定向
-    fan: null,
-    fanKey: '',
-    swath: null, // 横航足迹线
-    beam: null, // 瞬时扫描线（平台 → 地面摆动点）
-    beamHalf: 0, // 扫描半角（弧度）
-    beamPhase: 0, // 摆动扫描相位
+    // 平台代理扩展
+    head: null, // TLS 旋转头（播放时自转示意）
+    headSpin: 0,
+    platformAlt: 0, // 构建时的平台高度参数（车载桅顶 / TLS 仪器高）
     altitude: 0,
     // 航迹
     pathLine: null,
@@ -92,7 +80,6 @@ function createSimAnimation() {
     ctx.group.visible = false
     three.animGroup.add(ctx.group)
     buildPathLines()
-    buildScanner(0, 30)
     ctx.frame = frame
     three.onFrame(ctx.frame)
     ctx.mounted = true
@@ -106,7 +93,7 @@ function createSimAnimation() {
     if (ctx.group && ctx.group.parent) ctx.group.parent.remove(ctx.group)
     Object.assign(ctx, {
       group: null, pathLine: null, trailLine: null, trailAttr: null,
-      scanner: null, fan: null, fanKey: '', swath: null, beam: null, beamPhase: 0,
+      head: null, headSpin: 0, platformAlt: 0,
       course: [], cum: [0], length: 0, progress: 0, lastEmitted: 0, lastReveal: -1,
       platformKind: null, rotors: [], mounted: false,
     })
@@ -207,14 +194,35 @@ function createSimAnimation() {
     if (ctx.platform.parent) ctx.platform.parent.remove(ctx.platform)
     ctx.platform = null
     ctx.rotors = []
+    ctx.head = null
   }
 
   // 平台局部坐标：+X 为机头方向，+Z 为上（与场景 Z-up 一致，偏航即 rotation.z）
-  function buildPlatform(kind) {
+  // platform_id → 代理形态：上游支持多平台，动画按类型适配
+  function platformKind(id) {
+    switch (id) {
+      case 'sr22': return 'fixedwing'
+      case 'vehicle_linearpath':
+      case 'simple_linearpath': return 'vehicle'
+      case 'tripod': return 'tls'
+      case 'tripod_down': return 'tls_down'
+      default: return 'copter'
+    }
+  }
+
+  function isStaticKind(kind) {
+    return kind === 'tls' || kind === 'tls_down'
+  }
+
+  function buildPlatform(kind, altitude) {
     if (!ctx.group) return
     clearPlatform()
     ctx.platformKind = kind
-    ctx.platform = kind === 'Airborne' ? buildFixedWing() : buildCopter()
+    ctx.platformAlt = Number(altitude) || 0
+    if (kind === 'fixedwing') ctx.platform = buildFixedWing()
+    else if (kind === 'vehicle') ctx.platform = buildVehicle(ctx.platformAlt)
+    else if (isStaticKind(kind)) ctx.platform = buildTripod(ctx.platformAlt, kind === 'tls_down')
+    else ctx.platform = buildCopter()
     ctx.platform.name = 'platform'
     ctx.group.add(ctx.platform)
   }
@@ -314,80 +322,69 @@ function createSimAnimation() {
   }
 
   // 平台显示尺寸：按航迹尺度与航高取醒目的示意尺寸（真实比例下几乎不可见）
+  // 车载平台：原点落地，底盘+车轮+车顶桅杆，桅顶为扫描仪安装高度
+  function buildVehicle(alt) {
+    const h = Math.max(0.5, alt)
+    const g = new THREE.Group()
+    const bodyMat = new THREE.MeshStandardMaterial({ color: COLOR.body, roughness: 0.55, metalness: 0.15 })
+    const accentMat = new THREE.MeshStandardMaterial({ color: COLOR.accent, roughness: 0.4 })
+    const wheelMat = new THREE.MeshStandardMaterial({ color: COLOR.rotor, roughness: 0.9 })
+
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.8, 0.45), bodyMat)
+    chassis.position.set(0, 0, 0.55)
+    g.add(chassis)
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.7, 0.4), bodyMat)
+    cabin.position.set(-0.15, 0, 0.95)
+    g.add(cabin)
+
+    const wheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.14, 16)
+    ;[[-0.55, 0.4], [-0.55, -0.4], [0.55, 0.4], [0.55, -0.4]].forEach(([x, y]) => {
+      const w = new THREE.Mesh(wheelGeo, wheelMat)
+      w.position.set(x, y, 0.3)
+      g.add(w)
+    })
+
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, Math.max(0.2, h - 1.1), 10), accentMat)
+    mast.position.set(0.35, 0, (1.1 + h) / 2)
+    g.add(mast)
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.2, 16), accentMat)
+    head.position.set(0.35, 0, h)
+    g.add(head)
+    return g
+  }
+
+  // TLS 地基静态平台：三脚架 + 仪器头；down 变体扫描头朝下
+  function buildTripod(alt, down) {
+    const h = Math.max(0.5, alt)
+    const g = new THREE.Group()
+    const bodyMat = new THREE.MeshStandardMaterial({ color: COLOR.body, roughness: 0.55, metalness: 0.15 })
+    const accentMat = new THREE.MeshStandardMaterial({ color: COLOR.accent, roughness: 0.4 })
+
+    const legLen = Math.hypot(h, 0.35)
+    const legGeo = new THREE.CylinderGeometry(0.03, 0.03, legLen, 8)
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2
+      const leg = new THREE.Mesh(legGeo, bodyMat)
+      leg.position.set(Math.cos(a) * 0.17, Math.sin(a) * 0.17, h / 2)
+      leg.rotation.set(Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35)
+      g.add(leg)
+    }
+
+    const head = new THREE.Group()
+    head.position.set(0, 0, h)
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.16, 16), bodyMat)
+    head.add(core)
+    const instrument = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.14), accentMat)
+    instrument.position.set(0, 0, down ? -0.14 : 0.12)
+    head.add(instrument)
+    g.add(head)
+    ctx.head = head
+    return g
+  }
+
   function platformSize() {
     const base = Math.max(ctx.length * 0.02, ctx.altitude * 0.06, 1.5)
     return base * (ctx.platformScale || 1)
-  }
-
-  // ---------------------------- 扫描器示意 ----------------------------
-
-  function buildScanner(altitude, scanAngle) {
-    if (!ctx.group) return
-    const alt = Math.max(1, Number(altitude) || 0)
-    const half = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(Number(scanAngle) || 0, 1, 85))
-    const width = Math.max(0.5, alt * Math.tan(half)) // 幅宽半宽
-    const key = `${alt.toFixed(3)}|${width.toFixed(3)}`
-    if (key === ctx.fanKey) return
-    ctx.fanKey = key
-    ctx.altitude = alt
-    ctx.beamHalf = half
-
-    // 横航 rig：局部 +X 为横航向（外部按 航向+90° 定向），
-    // 扇面/足迹线/扫描线共用同一位姿，每帧整体定位，避免逐个对齐。
-    if (!ctx.scanner) {
-      ctx.scanner = new THREE.Group()
-      ctx.scanner.name = 'scanRig'
-      ctx.group.add(ctx.scanner)
-    }
-    disposeChildren(ctx.scanner)
-
-    // 扫描面扇面：线扫描器摆镜在横航面内扫掠，与地面交线为线段（非圆）
-    const fanGeo = new THREE.BufferGeometry()
-    fanGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-      0, 0, 0, -width, 0, -alt, width, 0, -alt,
-    ]), 3))
-    ctx.fan = new THREE.Mesh(
-      fanGeo,
-      new THREE.MeshBasicMaterial({
-        color: COLOR.cone, transparent: true, opacity: 0.12,
-        side: THREE.DoubleSide, depthWrite: false,
-      })
-    )
-    ctx.scanner.add(ctx.fan)
-
-    // 横航足迹线：扫描面在地面的单线投影，略高于地面避免 z-fighting
-    const swathGeo = new THREE.BufferGeometry()
-    swathGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-      -width, 0, -alt + 0.05, width, 0, -alt + 0.05,
-    ]), 3))
-    ctx.swath = new THREE.Line(
-      swathGeo,
-      new THREE.LineBasicMaterial({ color: COLOR.footprint, transparent: true, opacity: 0.9 })
-    )
-    ctx.swath.frustumCulled = false
-    ctx.scanner.add(ctx.swath)
-
-    // 瞬时扫描线（平台 → 当前摆角的地面点）
-    const beamGeo = new THREE.BufferGeometry()
-    beamGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
-    ctx.beam = new THREE.Line(
-      beamGeo,
-      new THREE.LineBasicMaterial({ color: COLOR.beam, transparent: true, opacity: 0.85 })
-    )
-    ctx.beam.frustumCulled = false
-    ctx.scanner.add(ctx.beam)
-  }
-
-  function updateBeam(visible) {
-    if (!ctx.beam) return
-    ctx.beam.visible = visible
-    if (!visible) return
-    // 摆镜在 ±half 内往复：theta 为当前摆角，地面点横航偏移 = alt * tan(theta)
-    const theta = ctx.beamHalf * Math.sin(ctx.beamPhase)
-    const attr = ctx.beam.geometry.getAttribute('position')
-    attr.setXYZ(0, 0, 0, 0)
-    attr.setXYZ(1, ctx.altitude * Math.tan(theta), 0, -ctx.altitude)
-    attr.needsUpdate = true
   }
 
   // ---------------------------- 每帧更新 ----------------------------
@@ -425,16 +422,18 @@ function createSimAnimation() {
   }
 
   function syncOptions(pb) {
-    if (pb.platformType !== ctx.platformKind) buildPlatform(pb.platformType)
+    const kind = platformKind(pb.platformType)
+    const alt = Number(pb.altitude) || 0
+    ctx.altitude = alt // 平台代理尺寸随航高/航迹长度缩放
+    if (kind !== ctx.platformKind || Math.abs(alt - ctx.platformAlt) > 1e-6) buildPlatform(kind, alt)
     ctx.platformScale = Number(pb.platformScale) > 0 ? Number(pb.platformScale) : 1
-    buildScanner(pb.altitude, pb.scanAngle) // 内部按 key 判断是否需要重建
   }
 
   function spin(dtScaled) {
     ctx.rotors.forEach((r) => {
       r.obj.rotation.z += r.dir * dtScaled * 26
     })
-    ctx.beamPhase += dtScaled * BEAM_VISUAL_HZ * Math.PI * 2
+    if (ctx.head) ctx.head.rotation.z += dtScaled * HEAD_VISUAL_RAD_S
   }
 
   function apply(pb) {
@@ -450,29 +449,32 @@ function createSimAnimation() {
     const p = sampleAt(ctx.progress)
     if (ctx.platform) {
       ctx.platform.visible = !!pb.showPlatform
-      ctx.platform.position.copy(p.pos)
-      if (p.dir && p.dir.lengthSq() > 1e-9) {
-        ctx.platform.rotation.z = Math.atan2(p.dir.y, p.dir.x)
+      if (isStaticKind(ctx.platformKind)) {
+        // TLS 地基静态：固定在航迹起点，不随进度移动
+        const s0 = ctx.course[0]
+        if (s0) ctx.platform.position.set(s0.x, s0.y, 0)
+        ctx.platform.rotation.z = 0
+      } else if (ctx.platformKind === 'vehicle') {
+        // 车载：底盘贴地，沿航迹水平投影移动
+        ctx.platform.position.set(p.pos.x, p.pos.y, 0)
+        if (p.dir && p.dir.lengthSq() > 1e-9) ctx.platform.rotation.z = Math.atan2(p.dir.y, p.dir.x)
+      } else {
+        ctx.platform.position.copy(p.pos)
+        if (p.dir && p.dir.lengthSq() > 1e-9) ctx.platform.rotation.z = Math.atan2(p.dir.y, p.dir.x)
       }
       const s = platformSize()
       if (Math.abs(ctx.platform.scale.x - s) > 1e-6) ctx.platform.scale.setScalar(s)
-    }
-    if (ctx.scanner) {
-      // rig 跟随平台：局部 +X 指向横航向（航向 + 90°），扇面/足迹线/扫描线随之定向
-      ctx.scanner.visible = !!pb.showScanner || !!pb.showFootprint
-      ctx.scanner.position.copy(p.pos)
-      ctx.scanner.rotation.z =
-        (p.dir && p.dir.lengthSq() > 1e-9 ? Math.atan2(p.dir.y, p.dir.x) : 0) + Math.PI / 2
-      if (ctx.fan) ctx.fan.visible = !!pb.showScanner
-      if (ctx.swath) ctx.swath.visible = !!pb.showFootprint
-      updateBeam(!!pb.showFootprint)
     }
     if (ctx.trailLine) {
       ctx.trailLine.visible = !!pb.showTrail
       updateTrail(p)
     }
     if (ctx.pathLine) ctx.pathLine.visible = !!pb.showTrail
-    if (pb.followCamera && three.controls) three.controls.target.lerp(p.pos, 0.12)
+    if (pb.followCamera && three.controls) {
+      // 静态平台不移动：视角跟随航迹起点而非采样点
+      const focus = isStaticKind(ctx.platformKind) && ctx.course[0] ? ctx.course[0] : p.pos
+      three.controls.target.lerp(focus, 0.12)
+    }
 
     const n = revealCount(ctx.progress, pb.revealMode, ctx.course.length - 1, total)
     reveal(n, total)
@@ -522,13 +524,6 @@ function createSimAnimation() {
     if (line.parent) line.parent.remove(line)
     if (line.geometry) line.geometry.dispose()
     if (line.material) line.material.dispose()
-  }
-
-  function removeMesh(mesh) {
-    if (!mesh) return
-    if (mesh.parent) mesh.parent.remove(mesh)
-    if (mesh.geometry) mesh.geometry.dispose()
-    if (mesh.material) mesh.material.dispose()
   }
 
   function disposeChildren(root) {

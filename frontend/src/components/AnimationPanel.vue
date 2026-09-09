@@ -1,10 +1,18 @@
 <script setup>
 import { computed } from 'vue'
 import { useAnimationStore } from '../stores/animation'
+import { useSimulationStore } from '../stores/simulation'
+import { getPlatform } from '../composables/scannerSpecs'
 
 // 仿真动画面板：播放控制、点云揭示方式、显示选项与航迹统计。
 // 所有控件直接双向绑定 animation store，Scene3D.vue 每帧读取该 store 驱动三维动画。
 const anim = useAnimationStore()
+const sim = useSimulationStore()
+
+// 高度参数含义随平台而变：航高 / 传感器高度 / 架设高度
+const altitudeLabel = computed(
+  () => getPlatform(sim.params.platform_id).params.altitude?.label || '航高'
+)
 
 const SPEEDS = [0.5, 1, 2, 4, 8]
 
@@ -13,7 +21,7 @@ const fmtInt = (v) => Number(v || 0).toLocaleString('en-US')
 
 const revealHint = computed(() =>
   anim.revealMode === 'strip'
-    ? `按航段离散揭示，共 ${anim.stats.segments} 条扫描条带`
+    ? `按航段离散揭示，共 ${anim.stats.segments} 段`
     : '按弧长比例连续揭示，最接近真实出点节奏'
 )
 
@@ -73,16 +81,8 @@ const cloudHint = computed(() =>
         <span>平台模型</span>
       </label>
       <label class="anim-check">
-        <input v-model="anim.showScanner" type="checkbox" />
-        <span>扫描面扇面</span>
-      </label>
-      <label class="anim-check">
-        <input v-model="anim.showFootprint" type="checkbox" />
-        <span>横航足迹线与扫描线</span>
-      </label>
-      <label class="anim-check">
         <input v-model="anim.showTrail" type="checkbox" />
-        <span>飞行航迹</span>
+        <span>航迹</span>
       </label>
       <label class="anim-check">
         <input v-model="anim.followCamera" type="checkbox" />
@@ -109,12 +109,8 @@ const cloudHint = computed(() =>
           <span class="stat-value">{{ fmt(anim.stats.duration) }} s</span>
         </div>
         <div class="stat-item">
-          <span class="stat-label">航高</span>
+          <span class="stat-label">{{ altitudeLabel }}</span>
           <span class="stat-value">{{ fmt(anim.stats.altitude) }} m</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">扫描幅宽</span>
-          <span class="stat-value">±{{ fmt(anim.stats.swath) }} m</span>
         </div>
         <div class="stat-item">
           <span class="stat-label">当前进度</span>

@@ -13,10 +13,8 @@ export const useAnimationStore = defineStore('animation', {
     autoPlay: true, // 新点云结果载入后自动重播
     revealMode: 'point', // point 逐点连续 | strip 逐条带（按航段离散揭示）
     // 显示选项
-    showPlatform: true, // 平台代理模型（无人机 / 固定翼）
-    showScanner: true, // 扫描面扇面（线扫描器扫描面）
-    showFootprint: true, // 横航足迹线与瞬时扫描线
-    showTrail: true, // 规划航迹与已飞轨迹
+    showPlatform: true, // 平台代理模型（旋翼 / 固定翼 / 车载 / TLS 三脚架）
+    showTrail: true, // 规划航迹与已行进轨迹
     followCamera: false, // 视角跟随平台
     platformScale: 1, // 平台模型显示倍率（示意尺寸，非真实比例）
     // 统计（由动画驱动器写回，供面板与播放条展示）
@@ -24,8 +22,7 @@ export const useAnimationStore = defineStore('animation', {
       pathLength: 0, // 航迹长度 (m)
       segments: 0, // 航段数
       duration: 0, // 单倍速播放时长 (s)
-      altitude: 0, // 航高 (m)
-      swath: 0, // 扫描幅宽半宽 (m)
+      altitude: 0, // 平台高度参数 (m)：航高 / 传感器高度 / 架设高度
       revealed: 0, // 已生成点数
       total: 0, // 点云总点数
     },
