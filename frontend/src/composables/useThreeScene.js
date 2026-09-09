@@ -51,6 +51,10 @@ function createThreeScene() {
     pcData: null, // {points, intensity}
     selectedIndex: -1,
     animationId: null,
+    // 仿真动画支撑
+    animGroup: null, // 动画对象根节点（useSimAnimation 挂载平台/扫描锥/轨迹）
+    clock: null, // 帧间隔计时
+    frameCallbacks: new Set(), // 每帧回调（外部动画驱动器注册，共用渲染循环）
     // 航点交互回调（由组件注入）
     wpCallbacks: { onAdd: null, onMove: null, onRemove: null },
     // 自绘拖拽
@@ -162,6 +166,11 @@ function createThreeScene() {
     state.scene.add(state.modelsGroup)
     state.waypointGroup = new THREE.Group()
     state.scene.add(state.waypointGroup)
+    // 动画层：仿真动画的所有对象挂在此组下，便于整体显隐与释放
+    state.animGroup = new THREE.Group()
+    state.animGroup.name = 'animGroup'
+    state.scene.add(state.animGroup)
+    state.clock = new THREE.Clock()
 
     state.waypointLine = new THREE.Line(
       new THREE.BufferGeometry(),
@@ -190,6 +199,7 @@ function createThreeScene() {
 
   function dispose() {
     if (state.animationId) cancelAnimationFrame(state.animationId)
+    state.frameCallbacks.clear()
     window.removeEventListener('keydown', onKeyDown)
     if (state._resizeObserver) {
       state._resizeObserver.disconnect()
@@ -209,9 +219,23 @@ function createThreeScene() {
 
   function animate() {
     state.animationId = requestAnimationFrame(animate)
+    // 帧回调先于渲染执行；RAF 已在上方登记，回调抛错不会中断渲染循环
+    if (state.frameCallbacks.size) {
+      const dt = state.clock ? state.clock.getDelta() : 0
+      state.frameCallbacks.forEach((cb) => cb(dt))
+    }
     state.controls.update()
     updateGrid()
     state.renderer.render(state.scene, state.camera)
+  }
+
+  // 注册/注销每帧回调：cb(dt)，dt 为上一帧到本帧的秒数
+  function onFrame(cb) {
+    if (typeof cb === 'function') state.frameCallbacks.add(cb)
+  }
+
+  function offFrame(cb) {
+    state.frameCallbacks.delete(cb)
   }
 
   function onResize() {
@@ -672,6 +696,7 @@ function createThreeScene() {
 
     state.pointCloud = new THREE.Points(geo, mat)
     state.scene.add(state.pointCloud)
+    geo.setDrawRange(0, n) // 默认完整显示；仿真动画用 revealPointCloud 逐步揭示
   }
 
   function updatePointCloud(options) {
@@ -700,6 +725,20 @@ function createThreeScene() {
       state.pointCloud = null
       state.pcData = null
     }
+  }
+
+  // 按出点顺序显示前 count 个点（仿真动画「点云逐步生成」）。
+  // 仅改写 drawRange，不重建缓冲区，可安全地每帧调用；count 传 Infinity 即完整显示。
+  function revealPointCloud(count) {
+    if (!state.pointCloud) return
+    const geo = state.pointCloud.geometry
+    const total = geo.getAttribute('position').count
+    geo.setDrawRange(0, Math.max(0, Math.min(total, Math.round(count))))
+  }
+
+  // 当前点云点数（无点云时为 0）
+  function getPointCloudCount() {
+    return state.pointCloud ? state.pointCloud.geometry.getAttribute('position').count : 0
   }
 
   function computeColors(points, intensity, options) {
@@ -770,12 +809,16 @@ function createThreeScene() {
     loadModel, removeModel, clearModels,
     setModelVisible, setModelBbox,
     setPointCloud, updatePointCloud, clearPointCloud,
+    revealPointCloud, getPointCloudCount,
     setWaypointCallbacks, renderWaypoints,
     setPickMode,
+    onFrame, offFrame,
     getSceneMaxZ,
     get renderer() { return state.renderer },
     get scene() { return state.scene },
     get camera() { return state.camera },
+    get controls() { return state.controls },
+    get animGroup() { return state.animGroup },
     setAxesVisible,
     setWaypointColor,
     setTrajectoryColor,

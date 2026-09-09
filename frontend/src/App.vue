@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useSceneStore } from './stores/scene'
 import { useWaypointStore } from './stores/waypoints'
 import { useSimulationStore } from './stores/simulation'
+import { useAnimationStore } from './stores/animation'
 import { useScreenshotStore } from './stores/screenshot'
 import { useHeliosAPI, connectLogWS } from './composables/useHeliosAPI'
 import { useThreeScene } from './composables/useThreeScene'
@@ -14,6 +15,7 @@ import WaypointList from './components/WaypointList.vue'
 import PointCloudPanel from './components/PointCloudPanel.vue'
 import ModelList from './components/ModelList.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import AnimationPanel from './components/AnimationPanel.vue'
 import LogConsole from './components/LogConsole.vue'
 import CoverageHeatmap from './components/CoverageHeatmap.vue'
 
@@ -21,6 +23,7 @@ import CoverageHeatmap from './components/CoverageHeatmap.vue'
 const sceneStore = useSceneStore()
 const waypointStore = useWaypointStore()
 const simStore = useSimulationStore()
+const animStore = useAnimationStore()
 const screenshotStore = useScreenshotStore()
 const api = useHeliosAPI()
 const three = useThreeScene()
@@ -241,7 +244,7 @@ async function loadResult() {
   try {
     const res = await api.getResult(simStore.taskId)
     simStore.result = res
-    simStore.addLog('INFO', `点云加载完成：${res.point_count} 个点`)
+    simStore.addLog('INFO', `点云加载完成：${res.point_count} 个点（可在「动画」Tab 或场景底部播放条回放生成过程）`)
   } catch (err) {
     simStore.addLog('ERROR', '结果加载失败：' + (err.response?.data?.detail || err.message))
   }
@@ -364,6 +367,12 @@ function addParameterOverlay(ctx, params, position, canvasWidth, canvasHeight) {
               <button class="btn" @click="onPickModel">模型上传</button>
               <button class="btn" @click="exportTrajectory">导出航迹</button>
               <button class="btn" @click="takeScreenshot">截图</button>
+              <button
+                class="btn btn-toggle"
+                :aria-pressed="animStore.enabled"
+                :title="animStore.enabled ? '关闭仿真回放：隐藏播放条与平台代理' : '开启仿真回放：显示播放条与平台代理'"
+                @click="animStore.enabled = !animStore.enabled"
+              >仿真回放</button>
               <button class="btn btn-primary" @click="runSimulation" v-if="simStore.status !== 'running'">执行仿真</button>
               <button class="btn btn-danger" @click="cancelSimulation" v-if="simStore.status === 'running'">取消</button>
               <span class="status-badge" :class="'status-' + simStore.status">
@@ -386,6 +395,7 @@ function addParameterOverlay(ctx, params, position, canvasWidth, canvasHeight) {
           <button :class="{ active: activeTab === 'pointcloud' }" @click="activeTab = 'pointcloud'">点云</button>
           <button :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">模型列表</button>
           <button :class="{ active: activeTab === 'trajectory' }" @click="activeTab = 'trajectory'">航迹</button>
+          <button :class="{ active: activeTab === 'animation' }" @click="activeTab = 'animation'">动画</button>
           <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">设置</button>
         </div>
         <ControlPanel v-if="activeTab === 'params'" />
@@ -403,6 +413,7 @@ function addParameterOverlay(ctx, params, position, canvasWidth, canvasHeight) {
           </section>
           <WaypointList />
         </template>
+        <AnimationPanel v-if="activeTab === 'animation'" />
         <SettingsPanel v-if="activeTab === 'settings'" />
       </aside>
     </div>
