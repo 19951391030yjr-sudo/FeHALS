@@ -74,11 +74,11 @@ const cloudHint = computed(() =>
       </label>
       <label class="anim-check">
         <input v-model="anim.showScanner" type="checkbox" />
-        <span>扫描光束锥</span>
+        <span>扫描面扇面</span>
       </label>
       <label class="anim-check">
         <input v-model="anim.showFootprint" type="checkbox" />
-        <span>地面足迹与扫描线</span>
+        <span>横航足迹线与扫描线</span>
       </label>
       <label class="anim-check">
         <input v-model="anim.showTrail" type="checkbox" />

@@ -78,8 +78,6 @@ make                    # 生成 build/Manuscript.pdf
 
 仅 OBJ 格式模型可参与 HELIOS++ 仿真；GLTF/STL 支持前端三维展示。
 
-> **关于无 HELIOS++ 环境**：可将 `HELIOS_PATH` 指向仓库自带的模拟引擎 `backend/tools/mock_helios/helios++.bat`（见其 README），即可跑通全链路并演示仿真动画；正式结果请指向真实 helios++。
->
 > **关于输出格式**：本机 `helios++`（Helios v2.0.1）构建的 LAS/LAZ 输出不可用（`LASopen` 返回空指针导致崩溃），因此系统**默认使用 XYZ 输出**。如需 LAS/LAZ，请重新编译 HELIOS++ 并确保正确链接 LASlib 后，在前端「输出格式」中选择 LAS/LAZ。
 
 > **关于平台/扫描器与航高**：UAV 与 Airborne 均使用 `copter_linearpath` 平台与 `riegl_vux-1uav` 扫描器（最小测程 3m，含 `headRotateAxis`/`beamOrigin` 定义，扫描方向正确为垂轨）。系统会把**所有航点统一抬升到设定的「飞行高度」**（恒定航高），仅用航点的水平位置（x、y）规划航线。

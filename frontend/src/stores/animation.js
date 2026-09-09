@@ -14,8 +14,8 @@ export const useAnimationStore = defineStore('animation', {
     revealMode: 'point', // point 逐点连续 | strip 逐条带（按航段离散揭示）
     // 显示选项
     showPlatform: true, // 平台代理模型（无人机 / 固定翼）
-    showScanner: true, // 扫描光束锥
-    showFootprint: true, // 地面足迹与旋转扫描线
+    showScanner: true, // 扫描面扇面（线扫描器扫描面）
+    showFootprint: true, // 横航足迹线与瞬时扫描线
     showTrail: true, // 规划航迹与已飞轨迹
     followCamera: false, // 视角跟随平台
     platformScale: 1, // 平台模型显示倍率（示意尺寸，非真实比例）

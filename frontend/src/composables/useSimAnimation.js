@@ -38,8 +38,8 @@ const COLOR = {
   beam: 0xfbbf24,
 }
 
-// 扫描线示意转速（转/秒）。真实 scan_freq 为 10~200 Hz，按真实值旋转在 60 fps 下
-// 会严重混叠，故取固定示意转速，仅表达「旋转扫描」这一事实。
+// 扫描线示意摆频（Hz）。真实 scan_freq 为 10~200 Hz，按真实值摆动在 60 fps 下
+// 会严重混叠，故取固定示意摆频，仅表达线扫描器「摆动扫描」这一事实。
 const BEAM_VISUAL_HZ = 0.8
 // 单帧最大步长（秒）：切走标签页后 RAF 停摆，回来时避免进度瞬移
 const MAX_DT = 0.1
@@ -55,14 +55,14 @@ function createSimAnimation() {
     platformKind: null,
     platformScale: 1,
     rotors: [], // [{obj, dir}] 旋翼 spinner（绕世界 Z 自转）
-    // 扫描器示意
-    cone: null,
-    coneKey: '',
-    footprint: null,
-    footprintDisc: null,
-    beam: null,
-    beamRadius: 0,
-    beamAngle: 0,
+    // 扫描器示意（线扫描器：扫描面垂直航向，地面投影为横航线段）
+    scanner: null, // 横航 rig：扇面/扫描线/足迹线挂其下，每帧整体定位与定向
+    fan: null,
+    fanKey: '',
+    swath: null, // 横航足迹线
+    beam: null, // 瞬时扫描线（平台 → 地面摆动点）
+    beamHalf: 0, // 扫描半角（弧度）
+    beamPhase: 0, // 摆动扫描相位
     altitude: 0,
     // 航迹
     pathLine: null,
@@ -106,7 +106,7 @@ function createSimAnimation() {
     if (ctx.group && ctx.group.parent) ctx.group.parent.remove(ctx.group)
     Object.assign(ctx, {
       group: null, pathLine: null, trailLine: null, trailAttr: null,
-      cone: null, coneKey: '', footprint: null, footprintDisc: null, beam: null,
+      scanner: null, fan: null, fanKey: '', swath: null, beam: null, beamPhase: 0,
       course: [], cum: [0], length: 0, progress: 0, lastEmitted: 0, lastReveal: -1,
       platformKind: null, rotors: [], mounted: false,
     })
@@ -325,50 +325,49 @@ function createSimAnimation() {
     if (!ctx.group) return
     const alt = Math.max(1, Number(altitude) || 0)
     const half = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(Number(scanAngle) || 0, 1, 85))
-    const radius = Math.max(0.5, alt * Math.tan(half))
-    const key = `${alt.toFixed(3)}|${radius.toFixed(3)}`
-    if (key === ctx.coneKey) return
-    ctx.coneKey = key
+    const width = Math.max(0.5, alt * Math.tan(half)) // 幅宽半宽
+    const key = `${alt.toFixed(3)}|${width.toFixed(3)}`
+    if (key === ctx.fanKey) return
+    ctx.fanKey = key
     ctx.altitude = alt
-    ctx.beamRadius = radius
+    ctx.beamHalf = half
 
-    // 光束锥：ConeGeometry 轴 +Y、顶点在上；转到 Z 轴后平移，使顶点落在平台处、开口落到地面
-    removeMesh(ctx.cone)
-    const coneGeo = new THREE.ConeGeometry(radius, alt, 48, 1, true)
-    coneGeo.rotateX(Math.PI / 2)
-    coneGeo.translate(0, 0, -alt / 2)
-    ctx.cone = new THREE.Mesh(
-      coneGeo,
+    // 横航 rig：局部 +X 为横航向（外部按 航向+90° 定向），
+    // 扇面/足迹线/扫描线共用同一位姿，每帧整体定位，避免逐个对齐。
+    if (!ctx.scanner) {
+      ctx.scanner = new THREE.Group()
+      ctx.scanner.name = 'scanRig'
+      ctx.group.add(ctx.scanner)
+    }
+    disposeChildren(ctx.scanner)
+
+    // 扫描面扇面：线扫描器摆镜在横航面内扫掠，与地面交线为线段（非圆）
+    const fanGeo = new THREE.BufferGeometry()
+    fanGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      0, 0, 0, -width, 0, -alt, width, 0, -alt,
+    ]), 3))
+    ctx.fan = new THREE.Mesh(
+      fanGeo,
       new THREE.MeshBasicMaterial({
-        color: COLOR.cone, transparent: true, opacity: 0.1,
+        color: COLOR.cone, transparent: true, opacity: 0.12,
         side: THREE.DoubleSide, depthWrite: false,
       })
     )
-    ctx.group.add(ctx.cone)
+    ctx.scanner.add(ctx.fan)
 
-    // 地面足迹（Ring/Circle 默认即 XY 平面，法向 +Z，无需旋转）
-    removeMesh(ctx.footprint)
-    ctx.footprint = new THREE.Mesh(
-      new THREE.RingGeometry(radius * 0.985, radius, 64),
-      new THREE.MeshBasicMaterial({
-        color: COLOR.footprint, transparent: true, opacity: 0.9,
-        side: THREE.DoubleSide, depthWrite: false,
-      })
+    // 横航足迹线：扫描面在地面的单线投影，略高于地面避免 z-fighting
+    const swathGeo = new THREE.BufferGeometry()
+    swathGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -width, 0, -alt + 0.05, width, 0, -alt + 0.05,
+    ]), 3))
+    ctx.swath = new THREE.Line(
+      swathGeo,
+      new THREE.LineBasicMaterial({ color: COLOR.footprint, transparent: true, opacity: 0.9 })
     )
-    ctx.group.add(ctx.footprint)
+    ctx.swath.frustumCulled = false
+    ctx.scanner.add(ctx.swath)
 
-    removeMesh(ctx.footprintDisc)
-    ctx.footprintDisc = new THREE.Mesh(
-      new THREE.CircleGeometry(radius, 64),
-      new THREE.MeshBasicMaterial({
-        color: COLOR.footprint, transparent: true, opacity: 0.06,
-        side: THREE.DoubleSide, depthWrite: false,
-      })
-    )
-    ctx.group.add(ctx.footprintDisc)
-
-    // 旋转扫描线（平台 → 地面瞬时光束示意）
-    removeLine(ctx.beam)
+    // 瞬时扫描线（平台 → 当前摆角的地面点）
     const beamGeo = new THREE.BufferGeometry()
     beamGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
     ctx.beam = new THREE.Line(
@@ -376,17 +375,18 @@ function createSimAnimation() {
       new THREE.LineBasicMaterial({ color: COLOR.beam, transparent: true, opacity: 0.85 })
     )
     ctx.beam.frustumCulled = false
-    ctx.group.add(ctx.beam)
+    ctx.scanner.add(ctx.beam)
   }
 
-  function updateBeam(p, visible) {
+  function updateBeam(visible) {
     if (!ctx.beam) return
     ctx.beam.visible = visible
     if (!visible) return
-    const r = ctx.beamRadius
+    // 摆镜在 ±half 内往复：theta 为当前摆角，地面点横航偏移 = alt * tan(theta)
+    const theta = ctx.beamHalf * Math.sin(ctx.beamPhase)
     const attr = ctx.beam.geometry.getAttribute('position')
-    attr.setXYZ(0, p.pos.x, p.pos.y, p.pos.z)
-    attr.setXYZ(1, p.pos.x + Math.cos(ctx.beamAngle) * r, p.pos.y + Math.sin(ctx.beamAngle) * r, 0)
+    attr.setXYZ(0, 0, 0, 0)
+    attr.setXYZ(1, ctx.altitude * Math.tan(theta), 0, -ctx.altitude)
     attr.needsUpdate = true
   }
 
@@ -434,7 +434,7 @@ function createSimAnimation() {
     ctx.rotors.forEach((r) => {
       r.obj.rotation.z += r.dir * dtScaled * 26
     })
-    ctx.beamAngle = (ctx.beamAngle + dtScaled * BEAM_VISUAL_HZ * Math.PI * 2) % (Math.PI * 2)
+    ctx.beamPhase += dtScaled * BEAM_VISUAL_HZ * Math.PI * 2
   }
 
   function apply(pb) {
@@ -457,20 +457,16 @@ function createSimAnimation() {
       const s = platformSize()
       if (Math.abs(ctx.platform.scale.x - s) > 1e-6) ctx.platform.scale.setScalar(s)
     }
-    if (ctx.cone) {
-      ctx.cone.visible = !!pb.showScanner
-      ctx.cone.position.copy(p.pos)
+    if (ctx.scanner) {
+      // rig 跟随平台：局部 +X 指向横航向（航向 + 90°），扇面/足迹线/扫描线随之定向
+      ctx.scanner.visible = !!pb.showScanner || !!pb.showFootprint
+      ctx.scanner.position.copy(p.pos)
+      ctx.scanner.rotation.z =
+        (p.dir && p.dir.lengthSq() > 1e-9 ? Math.atan2(p.dir.y, p.dir.x) : 0) + Math.PI / 2
+      if (ctx.fan) ctx.fan.visible = !!pb.showScanner
+      if (ctx.swath) ctx.swath.visible = !!pb.showFootprint
+      updateBeam(!!pb.showFootprint)
     }
-    const showFoot = !!pb.showFootprint
-    if (ctx.footprint) {
-      ctx.footprint.visible = showFoot
-      ctx.footprint.position.set(p.pos.x, p.pos.y, 0.05) // 略高于地面，避免与网格 z-fighting
-    }
-    if (ctx.footprintDisc) {
-      ctx.footprintDisc.visible = showFoot
-      ctx.footprintDisc.position.set(p.pos.x, p.pos.y, 0.04)
-    }
-    updateBeam(p, showFoot)
     if (ctx.trailLine) {
       ctx.trailLine.visible = !!pb.showTrail
       updateTrail(p)
