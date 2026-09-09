@@ -72,6 +72,7 @@ function createThreeScene() {
     axesGroup: null,
     _lastScaleKey: -1,
     _baseWpRadius: 0.3,
+    _resizeObserver: null,
   }
 
   const CLICK_MOVE_SQ = 25 // 点击 vs 拖动的位移阈值（像素²）
@@ -181,15 +182,19 @@ function createThreeScene() {
     dom.addEventListener('pointerup', onPointerUp)
     dom.addEventListener('contextmenu', onContextMenu)
     window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('resize', onResize)
+    state._resizeObserver = new ResizeObserver(() => onResize())
+    state._resizeObserver.observe(state.container)
 
     animate()
   }
 
   function dispose() {
     if (state.animationId) cancelAnimationFrame(state.animationId)
-    window.removeEventListener('resize', onResize)
     window.removeEventListener('keydown', onKeyDown)
+    if (state._resizeObserver) {
+      state._resizeObserver.disconnect()
+      state._resizeObserver = null
+    }
     if (state.renderer) {
       const dom = state.renderer.domElement
       dom.removeEventListener('pointerdown', onPointerDown)
@@ -216,6 +221,9 @@ function createThreeScene() {
     state.camera.aspect = w / h
     state.camera.updateProjectionMatrix()
     state.renderer.setSize(w, h)
+    if (state.waypointLine && state.waypointLine.material.resolution) {
+      state.waypointLine.material.resolution.set(w, h)
+    }
   }
 
   // ---------------------------- 自适应网格 ----------------------------
