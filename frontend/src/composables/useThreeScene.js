@@ -642,6 +642,7 @@ function createThreeScene() {
     setWaypointCallbacks, renderWaypoints,
     setPickMode,
     getSceneMaxZ,
+    get renderer() { return state.renderer },
     get scene() { return state.scene },
     get camera() { return state.camera },
   }

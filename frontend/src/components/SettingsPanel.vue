@@ -1,12 +1,27 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useHeliosAPI } from '../composables/useHeliosAPI'
+import { useScreenshotStore } from '../stores/screenshot'
 
 const api = useHeliosAPI()
 const cacheData = ref(null)
 const envData = ref(null)
 const loading = ref(false)
 const envLoading = ref(false)
+const screenshotStore = useScreenshotStore()
+const screenshotSettings = ref({ ...screenshotStore.settings })
+
+// 截图设置
+const showParamOptions = [
+  { value: true, label: '显示参数' },
+  { value: false, label: '隐藏参数' },
+]
+const overlayPositionOptions = [
+  { value: 'bottom-left', label: '左下' },
+  { value: 'bottom-right', label: '右下' },
+  { value: 'top-left', label: '左上' },
+  { value: 'top-right', label: '右上' },
+]
 
 async function loadCache() {
   loading.value = true
@@ -45,13 +60,44 @@ function fmtSize(bytes) {
   return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i]
 }
 
-const statusText = { ok: '正常', warning: '警告', error: '错误' }
-const statusIcon = { ok: '✓', warning: '!', error: '✗' }
+// 截图设置相关函数
+function updateScreenshotSetting(key, value) {
+  screenshotSettings.value[key] = value
+  if (key === 'customDimensions' && !value) {
+    screenshotSettings.value.width = 1920
+    screenshotSettings.value.height = 1080
+  }
+}
+
+function applyScreenshotSettings() {
+  screenshotStore.updateSettings(screenshotSettings.value)
+  // 保存到本地存储
+  localStorage.setItem('fehals_screenshot_settings', JSON.stringify(screenshotSettings.value))
+}
+
+function resetScreenshotSettings() {
+  screenshotSettings.value = { ...screenshotStore.settings.resetSettings() }
+  applyScreenshotSettings()
+}
 
 onMounted(() => {
+  // 加载保存的设置
+  const saved = localStorage.getItem('fehals_screenshot_settings')
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved)
+      screenshotSettings.value = { ...screenshotStore.settings, ...parsed }
+    } catch (e) {
+      console.error('Failed to load screenshot settings:', e)
+    }
+  }
   loadEnvDiag()
   loadCache()
 })
+
+// 用于模板的类型声明
+const statusText = { ok: '正常', warning: '警告', error: '错误' }
+const statusIcon = { ok: '✓', warning: '!', error: '✗' }
 </script>
 
 <template>
@@ -184,6 +230,90 @@ onMounted(() => {
         <span class="cache-info">{{ item.count }} 个文件 / {{ fmtSize(item.size) }}</span>
         <button class="btn btn-sm" @click="clearCache(key)">清理</button>
       </div>
+    </div>
+  </section>
+
+  <!-- 截图设置 -->
+  <section class="panel settings-panel">
+    <h3 class="panel-title">截图设置</h3>
+
+    <div class="settings-section">
+      <h4 class="section-title">参数显示</h4>
+      <div class="field">
+        <label>参数叠加</label>
+        <select v-model="screenshotSettings.showParameters" @change="updateScreenshotSetting('showParameters', $event.target.value)">
+          <option v-for="opt in showParamOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>叠加位置</label>
+        <select v-model="screenshotSettings.overlayPosition" @change="updateScreenshotSetting('overlayPosition', $event.target.value)">
+          <option v-for="opt in overlayPositionOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h4 class="section-title">图像质量</h4>
+      <div class="field">
+        <label>截图质量</label>
+        <div class="slider-container">
+          <input
+            type="range"
+            v-model="screenshotSettings.quality"
+            min="0.1"
+            max="1"
+            step="0.1"
+            @input="updateScreenshotSetting('quality', parseFloat($event.target.value))"
+          />
+          <span class="slider-value">{{ screenshotSettings.quality }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h4 class="section-title">图像尺寸</h4>
+      <div class="field checkbox-field">
+        <label>
+          <input
+            type="checkbox"
+            v-model="screenshotSettings.customDimensions"
+            @change="updateScreenshotSetting('customDimensions', $event.target.checked)"
+          />
+          <span>使用自定义尺寸</span>
+        </label>
+      </div>
+
+      <div v-if="screenshotSettings.customDimensions" class="dimensions-fields">
+        <div class="field">
+          <label>宽度 (px)</label>
+          <input
+            type="number"
+            v-model.number="screenshotSettings.width"
+            min="1"
+            @input="updateScreenshotSetting('width', parseInt($event.target.value) || 1920)"
+          />
+        </div>
+        <div class="field">
+          <label>高度 (px)</label>
+          <input
+            type="number"
+            v-model.number="screenshotSettings.height"
+            min="1"
+            @input="updateScreenshotSetting('height', parseInt($event.target.value) || 1080)"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn btn-primary" @click="applyScreenshotSettings">应用设置</button>
+      <button class="btn btn-secondary" @click="resetScreenshotSettings">重置默认</button>
     </div>
   </section>
 </template>
