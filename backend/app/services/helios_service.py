@@ -1,12 +1,12 @@
 """HELIOS++ 仿真执行服务。
 
-通过子进程调用 helios++ 可执行文件，实时捕获 stdout/stderr，
+通过 asyncio 子进程调用 helios++ 可执行文件，实时捕获 stdout/stderr，
 写入任务日志并通过 WebSocket 推送给前端。
 
-子进程以同步 subprocess.Popen 在独立线程中拉起并读取输出：
-Windows 下 uvicorn 的 reload 模式会将事件循环切到 Selector 策略，
-而 asyncio.create_subprocess_exec 在该策略下抛 NotImplementedError，
-线程方案对 Selector/Proactor 与 Linux/Windows 均适用。
+asyncio 子进程是唯一主路径；仅当事件循环策略不支持 asyncio 子进程
+（如 Windows 下 uvicorn 的 reload 模式切到 Selector 策略时
+asyncio.create_subprocess_exec 抛 NotImplementedError）才自动回退到
+独立线程中的普通 subprocess.Popen 并桥接输出，Linux / Proactor 行为不变。
 """
 import asyncio
 import os
@@ -23,7 +23,7 @@ from app.config import HELIOS_ASSETS, HELIOS_PATH, RESULTS_DIR, SIMULATION_TIMEO
 # 任务注册表：task_id -> SimulationTask
 TASKS: dict = {}
 
-# Windows 下避免为子进程弹出控制台窗口
+# 回退路径在 Windows 下避免为子进程弹出控制台窗口
 _CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
@@ -41,7 +41,7 @@ class SimulationTask:
         self.cancelled = False
         self.result_file: Optional[str] = None
         self.logs: list = []
-        self.process: Optional[subprocess.Popen] = None
+        self.process: Optional[object] = None  # asyncio.subprocess.Process 或回退时的 subprocess.Popen
         self.subscribers: list = []  # asyncio.Queue 列表
 
     async def push(self, msg: dict) -> None:
@@ -109,6 +109,15 @@ def _line_level(text: str) -> str:
     return "INFO"
 
 
+def _parse_progress(text: str) -> Optional[int]:
+    """尽力解析进度百分比（如 "Survey 50.00%"），无则返回 None。"""
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%", text)
+    if not m:
+        return None
+    pct = int(float(m.group(1)))
+    return pct if 0 <= pct <= 100 else None
+
+
 async def _run(task: SimulationTask, assets: list) -> None:
     cmd = [HELIOS_PATH, task.survey_path]
     for a in assets:
@@ -120,6 +129,75 @@ async def _run(task: SimulationTask, assets: list) -> None:
         cmd.append("--zipOutput")
 
     await task.push({"type": "log", "level": "INFO", "message": f"执行命令: {' '.join(cmd)}"})
+
+    try:
+        task.process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+    except NotImplementedError:
+        # 事件循环不支持 asyncio 子进程（Windows Selector 策略）：回退普通子进程
+        await task.push(
+            {
+                "type": "log",
+                "level": "WARNING",
+                "message": "当前事件循环不支持 asyncio 子进程，回退到普通子进程执行",
+            }
+        )
+        await _run_fallback(task, cmd)
+        return
+    except FileNotFoundError:
+        task.status = "failed"
+        task.message = f"未找到 HELIOS++ 可执行文件（{HELIOS_PATH}），请检查 HELIOS_PATH 配置。"
+        await task.push({"type": "error", "message": task.message})
+        return
+    except OSError as e:
+        task.status = "failed"
+        task.message = f"启动 HELIOS++ 失败：{e}"
+        await task.push({"type": "error", "message": task.message})
+        return
+
+    await _run_async(task)
+
+
+async def _run_async(task: SimulationTask) -> None:
+    """主路径：asyncio 流式读取子进程输出。"""
+    task.status = "running"
+    await task.push({"type": "log", "level": "INFO", "message": "仿真开始..."})
+
+    async def _read_stream() -> None:
+        assert task.process is not None and task.process.stdout is not None
+        while True:
+            line = await task.process.stdout.readline()
+            if not line:
+                break
+            text = line.decode("utf-8", errors="replace").rstrip()
+            if not text:
+                continue
+            await task.push({"type": "log", "level": _line_level(text), "message": text})
+            pct = _parse_progress(text)
+            if pct is not None:
+                task.progress = pct
+                await task.push({"type": "progress", "percent": pct, "message": text})
+
+    try:
+        await asyncio.wait_for(_read_stream(), timeout=SIMULATION_TIMEOUT)
+        await task.process.wait()
+    except asyncio.TimeoutError:
+        if task.process is not None:
+            task.process.kill()
+            await task.process.wait()
+        task.status = "failed"
+        task.message = f"仿真超时（>{SIMULATION_TIMEOUT}s），已终止。"
+        await task.push({"type": "error", "message": task.message})
+        return
+
+    await _finish(task)
+
+
+async def _run_fallback(task: SimulationTask, cmd: list) -> None:
+    """回退路径：独立线程拉起普通 subprocess.Popen，输出桥接到事件循环。"""
 
     def _spawn() -> subprocess.Popen:
         return subprocess.Popen(
@@ -159,15 +237,12 @@ async def _run(task: SimulationTask, assets: list) -> None:
                 asyncio.run_coroutine_threadsafe(
                     task.push({"type": "log", "level": _line_level(text), "message": text}), loop
                 )
-                # 尽力解析进度百分比（如 "Survey 50.00%"）
-                m = re.search(r"(\d+(?:\.\d+)?)\s*%", text)
-                if m:
-                    pct = int(float(m.group(1)))
-                    if 0 <= pct <= 100:
-                        task.progress = pct
-                        asyncio.run_coroutine_threadsafe(
-                            task.push({"type": "progress", "percent": pct, "message": text}), loop
-                        )
+                pct = _parse_progress(text)
+                if pct is not None:
+                    task.progress = pct
+                    asyncio.run_coroutine_threadsafe(
+                        task.push({"type": "progress", "percent": pct, "message": text}), loop
+                    )
         finally:
             try:
                 task.process.stdout.close()
@@ -189,6 +264,11 @@ async def _run(task: SimulationTask, assets: list) -> None:
         await task.push({"type": "error", "message": task.message})
         return
 
+    await _finish(task)
+
+
+async def _finish(task: SimulationTask) -> None:
+    """子进程结束后的统一收尾：按退出码判定成功/失败。"""
     rc = task.process.returncode
     if rc == 0:
         task.status = "completed"

@@ -19,7 +19,7 @@
 - 高度着色渐变抽取为共用模块 colorRamp.js（3D 点云着色与统计直方图共用）
 
 ### Fixed
-- Windows 下仿真子进程无法启动：uvicorn 的 reload 模式在 Windows 会将事件循环切到 Selector 策略，`asyncio.create_subprocess_exec` 在该策略下抛 NotImplementedError；helios_service 改为在独立线程中以同步 subprocess.Popen 拉起引擎并逐行桥接日志/进度，Selector/Proactor 与 Linux/Windows 均适用（取消、超时、进度解析与日志分级行为不变）
+- Windows 下仿真子进程无法启动：uvicorn 的 reload 模式在 Windows 会将事件循环切到 Selector 策略，`asyncio.create_subprocess_exec` 在该策略下抛 NotImplementedError；helios_service 保留 asyncio 子进程主路径，仅当事件循环不支持 asyncio 子进程时自动回退到独立线程中的普通 subprocess.Popen 并逐行桥接日志/进度（取消、超时、进度解析与日志分级行为不变）
 - 结果接口响应补充 stats 字段，修复前端统计面板无数据
 - 页面加载时拉取后端已注册模型，修复刷新后模型列表为空
 - 修复航高自动计算在增删模型后仍显示上一次结果的 bug：模型列表变化时清空建议航高
