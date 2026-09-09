@@ -181,8 +181,9 @@ function createThreeScene() {
       state._lastGridDist = gridDist
       const size = Math.max(30, dist * 2.5)
       const divisions = Math.max(10, Math.min(150, Math.round(size / 2)))
+      const evenDiv = Math.round(divisions / 2) * 2 // 保证偶数，使中心加粗轴线正确绘制
       state.scene.remove(state.grid)
-      state.grid = new THREE.GridHelper(size, divisions, 0x999999, 0xd0d0d0)
+      state.grid = new THREE.GridHelper(size, evenDiv, 0x999999, 0xd0d0d0)
       state.grid.rotation.x = Math.PI / 2 // Z-up
       state.scene.add(state.grid)
     }
