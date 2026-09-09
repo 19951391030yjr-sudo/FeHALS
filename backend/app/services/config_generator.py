@@ -82,30 +82,40 @@ def detect_up_axis(obj_path: str) -> str:
     return "y" if up_idx == 1 else "z"
 
 
-def generate_scene_xml(model_path: Optional[str], up: str = "z") -> Tuple[Path, str]:
+def generate_scene_xml(
+    model_paths: Optional[list[tuple[str, str]]] = None
+) -> Tuple[Path, str]:
     """生成场景 XML，返回 (xml 路径, scene_id)。
 
-    model_path 为绝对路径时加载用户上传的 OBJ 模型（objloader 的 up 参数用于
-    指示模型 up 轴，HELIOS++ 会把 'y' 旋转为 Z-up）；为 None 时使用默认地面平面。
+    model_paths 为 [(路径, up_轴), ...]，每个元组在场景中生成一个独立的 <part>。
+    为 None 或空列表时使用默认地面平面。
     """
     scene_id = f"fehals_scene_{int(time.time() * 1000)}"
-    if model_path:
-        filepath = model_path  # 绝对路径，objloader 直接打开
+    parts = []
+    if model_paths:
+        for p, up in model_paths:
+            up_line = f'                <param type="string" key="up" value="{up}" />\n'
+            parts.append(
+                "        <part>\n"
+                '            <filter type="objloader">\n'
+                f'                <param type="string" key="filepath" value="{_esc(p)}" />\n'
+                f"{up_line}"
+                "            </filter>\n"
+                "        </part>\n"
+            )
     else:
-        filepath = _DEFAULT_GROUNDPLANE  # 相对路径，经 --assets 解析
-        up = "z"
-
-    up_param = f'                <param type="string" key="up" value="{up}" />\n' if model_path else ""
+        parts.append(
+            "        <part>\n"
+            '            <filter type="objloader">\n'
+            f'                <param type="string" key="filepath" value="{_DEFAULT_GROUNDPLANE}" />\n'
+            "            </filter>\n"
+            "        </part>\n"
+        )
     content = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         "<document>\n"
         f'    <scene id="{scene_id}" name="{scene_id}">\n'
-        "        <part>\n"
-        '            <filter type="objloader">\n'
-        f'                <param type="string" key="filepath" value="{_esc(filepath)}" />\n'
-        f"{up_param}"
-        "            </filter>\n"
-        "        </part>\n"
+        f'{"".join(parts)}'
         "    </scene>\n"
         "</document>\n"
     )

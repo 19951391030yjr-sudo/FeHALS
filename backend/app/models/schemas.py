@@ -37,7 +37,7 @@ class SimulationRunRequest(BaseModel):
 
     trajectory_id: str
     config_id: str
-    scene_model_id: Optional[str] = None
+    scene_model_ids: Optional[List[str]] = None
 
 
 class SimulationStatus(BaseModel):

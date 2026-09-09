@@ -180,7 +180,9 @@ async function runSimulation() {
     const run = await api.runSimulation({
       trajectory_id: traj.file_id,
       config_id: cfg.config_id,
-      scene_model_id: sceneStore.activeModelId || null,
+      scene_model_ids: sceneStore.models
+        .filter((m) => /\.obj$/i.test(m.name))
+        .map((m) => m.id) || null,
     })
     simStore.taskId = run.task_id
     simStore.status = 'running'

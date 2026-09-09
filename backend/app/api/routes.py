@@ -182,19 +182,18 @@ async def run_simulation(req: SimulationRunRequest):
         raise HTTPException(404, f"配置不存在：{req.config_id}")
 
     # 3. 校验模型（可选）
-    model_path = None
-    model_up = "z"
-    if req.scene_model_id:
-        m = MODEL_REGISTRY.get(req.scene_model_id)
-        if not m:
-            raise HTTPException(404, f"模型不存在：{req.scene_model_id}")
-        if m["ext"] != ".obj":
-            raise HTTPException(400, "仅 OBJ 格式模型可参与 HELIOS++ 仿真（GLTF/STL 仅用于三维展示）")
-        model_path = m["path"]
-        model_up = m.get("up", "z")
+    model_entries: list[tuple[str, str]] = []
+    if req.scene_model_ids:
+        for mid in req.scene_model_ids:
+            m = MODEL_REGISTRY.get(mid)
+            if not m:
+                raise HTTPException(404, f"模型不存在：{mid}")
+            if m["ext"] != ".obj":
+                raise HTTPException(400, f"模型「{m['filename']}」不是 OBJ 格式（仅 OBJ 可参与 HELIOS++ 仿真）")
+            model_entries.append((m["path"], m.get("up", "z")))
 
     # 4. 生成 scene + survey XML
-    scene_xml, scene_id = config_generator.generate_scene_xml(model_path, up=model_up)
+    scene_xml, scene_id = config_generator.generate_scene_xml(model_entries if model_entries else None)
     survey_xml = config_generator.generate_survey_xml(
         scene_xml_path=str(scene_xml),
         scene_id=scene_id,
