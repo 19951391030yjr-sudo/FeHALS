@@ -84,4 +84,6 @@ make                    # 生成 build/Manuscript.pdf
 
 ## 文档
 
-系统设计详见 [doc/Manuscript.tex](doc/Manuscript.tex)。
+- [项目设计书](doc/src/DESIGNBOOK.tex)
+- [FeHALS 文档](doc/src/DOCUMENT.tex)
+- [CODEOWNER 个人总结](doc/src/DESCRIPTION.tex)
