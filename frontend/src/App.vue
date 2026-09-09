@@ -368,7 +368,7 @@ function addParameterOverlay(ctx, params, position, canvasWidth, canvasHeight) {
               <button class="btn" @click="exportTrajectory">导出航迹</button>
               <button class="btn" @click="takeScreenshot">截图</button>
               <button
-                class="btn btn-toggle"
+                class="btn btn-toggle playback-toggle"
                 :aria-pressed="animStore.enabled"
                 :title="animStore.enabled ? '关闭仿真回放：隐藏播放条与平台代理' : '开启仿真回放：显示播放条与平台代理'"
                 @click="animStore.enabled = !animStore.enabled"
@@ -425,3 +425,22 @@ function addParameterOverlay(ctx, params, position, canvasWidth, canvasHeight) {
     <CoverageHeatmap />
   </div>
 </template>
+
+<style scoped>
+.playback-toggle[aria-pressed="false"] {
+  background: #9ca3af;
+  border-color: #9ca3af;
+  color: #fff;
+}
+.playback-toggle[aria-pressed="false"]:hover {
+  background: #6b7280;
+}
+.playback-toggle[aria-pressed="true"] {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+.playback-toggle[aria-pressed="true"]:hover {
+  background: #15803d;
+}
+</style>
