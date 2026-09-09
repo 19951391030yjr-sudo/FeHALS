@@ -106,6 +106,7 @@ function createThreeScene() {
     )
     // PlaneGeometry 默认即 XY 平面（法向 +Z），无需旋转
     state.groundPlane.name = 'groundPlane'
+    state.groundPlane.position.set(0, 0, 0)
     state.scene.add(state.groundPlane)
 
     state.modelsGroup = new THREE.Group()
@@ -189,6 +190,8 @@ function createThreeScene() {
     }
     // 网格跟随视图中心（投影在 z=0 平面）
     state.grid.position.set(target.x, target.y, 0)
+    // 地面平面也要跟随视图中心，以确保射线拾取与网格显示一致
+    state.groundPlane.position.set(target.x, target.y, 0)
   }
 
   // ---------------------------- 拾取 ----------------------------
