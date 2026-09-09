@@ -21,7 +21,8 @@ class CoverageRequest(BaseModel):
 class ConfigRequest(BaseModel):
     """仿真参数配置请求。"""
 
-    platform_type: str = "UAV"  # UAV | Airborne | Terrestrial
+    platform_id: str = "copter_linearpath"
+    scanner_id: str = "riegl_vux-1uav"
     speed: float = 5.0  # 飞行速度 (m/s)
     altitude: float = 100.0  # 飞行高度 (m)
     scan_freq: float = 10.0  # 扫描频率 (Hz)

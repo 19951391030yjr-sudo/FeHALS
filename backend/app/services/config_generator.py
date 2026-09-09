@@ -14,15 +14,13 @@ from typing import Optional, Tuple
 
 from app.config import CONFIGS_DIR
 
-# 平台类型 → HELIOS++ 平台目录项（均为 linearpath 型，配合 interpolated 运动模型）
-PLATFORM_MAP = {
-    "UAV": "copter_linearpath",
-    "Airborne": "copter_linearpath",
-}
-
-SCANNER_MAP = {
-    "UAV": ("scanners_als.xml", "riegl_vux-1uav"),
-    "Airborne": ("scanners_als.xml", "riegl_vux-1uav"),
+# 扫描器 ID → (XML 文件名, HELIOS++ 引用 ID)
+# 数据源：3rd/helios/python/pyhelios/data/{scanners_als,scanners_tls}.xml
+SCANNER_FILE_MAP = {
+    "riegl_vux-1uav": ("scanners_als.xml", "riegl_vux-1uav"),
+    "riegl_vq_780i": ("scanners_als.xml", "riegl_vq_780i"),
+    "vlp16": ("scanners_tls.xml", "vlp16"),
+    "livox-avia-non-repetitive": ("scanners_tls.xml", "livox-avia-non-repetitive"),
 }
 
 # 无模型时的默认地面场景（通过 --assets 仓库根目录解析）
@@ -131,9 +129,11 @@ def generate_survey_xml(
     params: dict,
 ) -> Path:
     """生成 survey XML，返回其路径。"""
-    platform_type = params.get("platform_type", "UAV")
-    platform_id = PLATFORM_MAP.get(platform_type, "copter_linearpath")
-    scanner_file, scanner_id = SCANNER_MAP.get(platform_type, ("scanners_als.xml", "riegl_vq-780i"))
+    platform_id = params.get("platform_id", "copter_linearpath")
+    scanner_id = params.get("scanner_id", "riegl_vux-1uav")
+    scanner_file, scanner_id_ref = SCANNER_FILE_MAP.get(
+        scanner_id, ("scanners_als.xml", "riegl_vux-1uav")
+    )
 
     # 参数映射：脉冲频率 kHz -> Hz；±半角 -> 总扫描角
     pulse_hz = float(params.get("pulse_freq", 50.0)) * 1000.0
@@ -150,7 +150,7 @@ def generate_survey_xml(
         f'            scene="{_esc(scene_xml_path)}#{scene_id}"\n'
         '            platform="interpolated"\n'
         f'            basePlatform="data/platforms.xml#{platform_id}"\n'
-        f'            scanner="data/{scanner_file}#{scanner_id}">\n'
+        f'            scanner="data/{scanner_file}#{scanner_id_ref}">\n'
         "        <leg>\n"
         "            <platformSettings\n"
         f'                trajectory="{_esc(traj_path)}"\n'

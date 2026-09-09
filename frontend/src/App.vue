@@ -6,7 +6,7 @@ import { useSimulationStore } from './stores/simulation'
 import { useHeliosAPI, connectLogWS } from './composables/useHeliosAPI'
 import { useThreeScene } from './composables/useThreeScene'
 import { generateBowtie } from './composables/useBowtie'
-import { getParams } from './composables/scannerSpecs'
+import { getPlatform, getScanner } from './composables/scannerSpecs'
 import Scene3D from './components/Scene3D.vue'
 import ControlPanel from './components/ControlPanel.vue'
 import WaypointList from './components/WaypointList.vue'
@@ -147,9 +147,9 @@ async function runSimulation() {
     simStore.addLog('WARNING', '已有仿真任务正在运行')
     return
   }
-  const minAlt = getParams(simStore.params.platform_type).scanner.params.rangeMin.default
+  const minAlt = getScanner(simStore.params.scanner_id).params.rangeMin.default
   if (simStore.params.altitude < minAlt) {
-    simStore.addLog('ERROR', `飞行高度 ${simStore.params.altitude}m 低于 ${simStore.params.platform_type} 平台最小测程 ${minAlt}m，请调高航高或改用 UAV 平台`)
+    simStore.addLog('ERROR', `飞行高度 ${simStore.params.altitude}m 低于扫描器最小测程 ${minAlt}m，请调高航高或改用更远测程的扫描器`)
     return
   }
   if (!waypointStore.count) {
@@ -157,8 +157,9 @@ async function runSimulation() {
     return
   }
   // 参数范围校验
-  const specs = getParams(simStore.params.platform_type)
-  const allSpecs = { ...specs.platform.params, ...specs.scanner.params }
+  const plat = getPlatform(simStore.params.platform_id)
+  const sc = getScanner(simStore.params.scanner_id)
+  const allSpecs = { ...plat.params, ...sc.params }
   for (const [key, spec] of Object.entries(allSpecs)) {
     if (spec.readonly) continue
     const val = simStore.params[key]
