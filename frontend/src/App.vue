@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useSceneStore } from './stores/scene'
 import { useWaypointStore } from './stores/waypoints'
 import { useSimulationStore } from './stores/simulation'
+import { useAnimationStore } from './stores/animation'
 import { useScreenshotStore } from './stores/screenshot'
 import { useHeliosAPI, connectLogWS } from './composables/useHeliosAPI'
 import { useThreeScene } from './composables/useThreeScene'
@@ -22,6 +23,7 @@ import CoverageHeatmap from './components/CoverageHeatmap.vue'
 const sceneStore = useSceneStore()
 const waypointStore = useWaypointStore()
 const simStore = useSimulationStore()
+const animStore = useAnimationStore()
 const screenshotStore = useScreenshotStore()
 const api = useHeliosAPI()
 const three = useThreeScene()
@@ -365,6 +367,12 @@ function addParameterOverlay(ctx, params, position, canvasWidth, canvasHeight) {
               <button class="btn" @click="onPickModel">模型上传</button>
               <button class="btn" @click="exportTrajectory">导出航迹</button>
               <button class="btn" @click="takeScreenshot">截图</button>
+              <button
+                class="btn btn-toggle"
+                :aria-pressed="animStore.enabled"
+                :title="animStore.enabled ? '关闭仿真回放：隐藏播放条与平台代理' : '开启仿真回放：显示播放条与平台代理'"
+                @click="animStore.enabled = !animStore.enabled"
+              >仿真回放</button>
               <button class="btn btn-primary" @click="runSimulation" v-if="simStore.status !== 'running'">执行仿真</button>
               <button class="btn btn-danger" @click="cancelSimulation" v-if="simStore.status === 'running'">取消</button>
               <span class="status-badge" :class="'status-' + simStore.status">

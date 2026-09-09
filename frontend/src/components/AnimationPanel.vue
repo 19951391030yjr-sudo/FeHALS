@@ -36,7 +36,10 @@ const cloudHint = computed(() =>
   <section class="panel animation-panel">
     <h3 class="panel-title">仿真动画</h3>
 
-    <div v-if="!anim.ready" class="pc-empty">
+    <div v-if="!anim.enabled" class="pc-empty">
+      仿真回放已关闭：可点击顶部工具条「仿真回放」按钮重新开启
+    </div>
+    <div v-else-if="!anim.ready" class="pc-empty">
       暂无可用航迹：请先在场景中点击添加航点（至少 1 个）
     </div>
 

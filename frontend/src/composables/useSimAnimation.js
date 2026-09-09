@@ -51,7 +51,6 @@ function createSimAnimation() {
     head: null, // TLS 旋转头（播放时自转示意）
     headSpin: 0,
     platformAlt: 0, // 构建时的平台高度参数（车载桅顶 / TLS 仪器高）
-    altitude: 0,
     // 航迹
     pathLine: null,
     trailLine: null,
@@ -382,9 +381,11 @@ function createSimAnimation() {
     return g
   }
 
-  function platformSize() {
-    const base = Math.max(ctx.length * 0.02, ctx.altitude * 0.06, 1.5)
-    return base * (ctx.platformScale || 1)
+  // 代理模型视觉大小不随视图缩放改变：世界尺寸与相机距离成正比
+  // （与航点 / 航向箭头 / 坐标轴同一约定），「平台大小」滑杆作为用户倍率。
+  function platformSize(pos) {
+    const dist = three.camera ? three.camera.position.distanceTo(pos) : 100
+    return Math.max(0.2, dist * 0.03) * (ctx.platformScale || 1)
   }
 
   // ---------------------------- 每帧更新 ----------------------------
@@ -424,7 +425,6 @@ function createSimAnimation() {
   function syncOptions(pb) {
     const kind = platformKind(pb.platformType)
     const alt = Number(pb.altitude) || 0
-    ctx.altitude = alt // 平台代理尺寸随航高/航迹长度缩放
     if (kind !== ctx.platformKind || Math.abs(alt - ctx.platformAlt) > 1e-6) buildPlatform(kind, alt)
     ctx.platformScale = Number(pb.platformScale) > 0 ? Number(pb.platformScale) : 1
   }
@@ -462,7 +462,7 @@ function createSimAnimation() {
         ctx.platform.position.copy(p.pos)
         if (p.dir && p.dir.lengthSq() > 1e-9) ctx.platform.rotation.z = Math.atan2(p.dir.y, p.dir.x)
       }
-      const s = platformSize()
+      const s = platformSize(ctx.platform.position)
       if (Math.abs(ctx.platform.scale.x - s) > 1e-6) ctx.platform.scale.setScalar(s)
     }
     if (ctx.trailLine) {

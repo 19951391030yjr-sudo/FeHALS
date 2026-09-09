@@ -91,6 +91,17 @@ body,
   font-size: 12px;
 }
 
+/* 工具条功能开关按钮：按下态表示功能开启 */
+.btn-toggle[aria-pressed="true"] {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.btn-toggle[aria-pressed="true"]:hover {
+  background: #1d4ed8;
+}
+
 .btn-danger {
   background: #dc2626;
   border-color: #dc2626;

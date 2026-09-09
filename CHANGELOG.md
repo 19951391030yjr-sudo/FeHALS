@@ -17,6 +17,8 @@
 ### Changed
 - XYZ 点云解析改为逐行流式读取，避免大点云文件整体载入内存
 - 高度着色渐变抽取为共用模块 colorRamp.js（3D 点云着色与统计直方图共用）
+- 仿真回放改为独立可开关功能：顶部工具条新增「仿真回放」按钮控制启闭；关闭时隐藏场景播放条与平台代理，仿真完成后点云仍按原有逻辑加载并完整呈现，二者互不耦合
+- 平台代理模型视觉大小随视角缩放自适应：世界尺寸与相机距离成正比（与航点 / 航向箭头 / 坐标轴同一约定），「平台大小」滑杆作为倍率
 
 ### Fixed
 - Windows 下仿真子进程无法启动：uvicorn 的 reload 模式在 Windows 会将事件循环切到 Selector 策略，`asyncio.create_subprocess_exec` 在该策略下抛 NotImplementedError；helios_service 保留 asyncio 子进程主路径，仅当事件循环不支持 asyncio 子进程时自动回退到独立线程中的普通 subprocess.Popen 并逐行桥接日志/进度（取消、超时、进度解析与日志分级行为不变）

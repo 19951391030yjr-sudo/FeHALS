@@ -5,6 +5,7 @@ import { defineStore } from 'pinia'
 // 本 store 是其响应式控制面，二者由 Scene3D.vue 桥接（组合式函数不直接依赖 store）。
 export const useAnimationStore = defineStore('animation', {
   state: () => ({
+    enabled: true, // 仿真动画总开关（关闭后隐藏播放条与平台代理，点云恢复完整显示）
     ready: false, // 航迹是否可用（至少 1 个航点）
     playing: false,
     progress: 0, // 0 ~ 1，沿航迹的归一化弧长

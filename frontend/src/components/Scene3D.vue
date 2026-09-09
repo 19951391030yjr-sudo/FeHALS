@@ -76,6 +76,24 @@ onMounted(() => {
   rebuildCourse()
 })
 
+// 动画总开关（设置 Tab）：关闭时卸载驱动器并隐藏播放条，开启时重新挂载并重建航迹
+watch(
+  () => animStore.enabled,
+  (on) => {
+    if (!on) {
+      anim.unmount()
+      animStore.reset()
+      return
+    }
+    anim.mount({
+      getPlayback: playbackSnapshot,
+      onProgress: (progress, info) =>
+        animStore.updateProgress(progress, info.revealed, info.total, info.finished),
+    })
+    rebuildCourse()
+  }
+)
+
 onBeforeUnmount(() => {
   anim.unmount()
   three.dispose()
@@ -151,6 +169,11 @@ watch(
     if (!result) return
     three.setPointCloud(result.points, result.intensity, sceneStore.pointOptions)
     animStore.setStats({ total: three.getPointCloudCount() })
+    // 仿真回放关闭时：仅加载点云并完整呈现，不与原有结果加载流程耦合
+    if (!animStore.enabled) {
+      three.revealPointCloud(Infinity)
+      return
+    }
     // 自动播放开启时从头演示点云生成过程；否则直接呈现完整点云（进度置 100%）
     if (animStore.ready && animStore.autoPlay) {
       animStore.restart()

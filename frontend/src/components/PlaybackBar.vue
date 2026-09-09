@@ -25,7 +25,7 @@ function onScrub(e) {
 </script>
 
 <template>
-  <div v-if="anim.ready" class="playback-bar">
+  <div v-if="anim.enabled && anim.ready" class="playback-bar">
     <button class="pb-icon" :title="anim.playing ? '暂停' : '播放'" @click="anim.toggle()">
       <svg v-if="anim.playing" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
         <path d="M6 5h4v14H6zM14 5h4v14h-4z" />
