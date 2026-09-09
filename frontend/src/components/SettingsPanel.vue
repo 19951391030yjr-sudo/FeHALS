@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useHeliosAPI } from '../composables/useHeliosAPI'
 import { useScreenshotStore } from '../stores/screenshot'
+import { useSceneStore } from '../stores/scene'
 
 const api = useHeliosAPI()
 const cacheData = ref(null)
@@ -10,6 +11,13 @@ const loading = ref(false)
 const envLoading = ref(false)
 const screenshotStore = useScreenshotStore()
 const screenshotSettings = ref({ ...screenshotStore.settings })
+const sceneStore = useSceneStore()
+const renderOptions = ref({ ...sceneStore.renderOptions })
+
+function onRenderOptionChange(key, value) {
+  renderOptions.value[key] = value
+  sceneStore.renderOptions = { ...sceneStore.renderOptions, [key]: value }
+}
 
 // 截图设置
 const showParamOptions = [
@@ -76,7 +84,8 @@ function applyScreenshotSettings() {
 }
 
 function resetScreenshotSettings() {
-  screenshotSettings.value = { ...screenshotStore.settings.resetSettings() }
+  screenshotStore.resetSettings()
+  screenshotSettings.value = { ...screenshotStore.settings }
   applyScreenshotSettings()
 }
 
@@ -233,6 +242,66 @@ const statusIcon = { ok: '✓', warning: '!', error: '✗' }
     </div>
   </section>
 
+  <!-- 渲染设置 -->
+  <section class="panel settings-panel">
+    <h3 class="panel-title">渲染</h3>
+
+    <div class="settings-section">
+      <h4 class="section-title">坐标轴</h4>
+      <div class="field checkbox-field">
+        <label>
+          <input type="checkbox" :checked="renderOptions.showAxes"
+                 @change="onRenderOptionChange('showAxes', $event.target.checked)" />
+          <span>显示 XYZ 坐标轴（RGB）</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="color-line">
+        <h4 class="section-title">航点</h4>
+        <div class="color-picker-wrap">
+          <input :value="renderOptions.waypointColor" type="color"
+                 @input="onRenderOptionChange('waypointColor', $event.target.value)" title="航点颜色" />
+          <code>{{ renderOptions.waypointColor }}</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="color-line">
+        <h4 class="section-title">航线</h4>
+        <div class="color-picker-wrap">
+          <input :value="renderOptions.trajectoryColor" type="color"
+                 @input="onRenderOptionChange('trajectoryColor', $event.target.value)" title="航线颜色" />
+          <code>{{ renderOptions.trajectoryColor }}</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="color-line">
+        <h4 class="section-title">航向箭头</h4>
+        <div class="color-picker-wrap">
+          <input :value="renderOptions.arrowColor" type="color"
+                 @input="onRenderOptionChange('arrowColor', $event.target.value)" title="航向箭头颜色" />
+          <code>{{ renderOptions.arrowColor }}</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h4 class="section-title">箭头显示</h4>
+      <div class="field checkbox-field">
+        <label>
+          <input type="checkbox" :checked="renderOptions.showArrows"
+                 @change="onRenderOptionChange('showArrows', $event.target.checked)" />
+          <span>显示航向箭头</span>
+        </label>
+      </div>
+    </div>
+  </section>
+
   <!-- 截图设置 -->
   <section class="panel settings-panel">
     <h3 class="panel-title">截图设置</h3>
@@ -317,3 +386,35 @@ const statusIcon = { ok: '✓', warning: '!', error: '✗' }
     </div>
   </section>
 </template>
+
+<style scoped>
+.color-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.color-line .section-title {
+  margin-bottom: 0;
+}
+.color-picker-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.color-picker-wrap input[type="color"] {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+}
+.color-picker-wrap code {
+  font-size: 11px;
+  opacity: 0.65;
+  min-width: 5em;
+}
+</style>

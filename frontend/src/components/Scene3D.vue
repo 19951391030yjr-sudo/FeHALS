@@ -96,6 +96,19 @@ watch(
   (opts) => three.updatePointCloud(opts),
   { deep: true }
 )
+
+// 渲染选项变化 → 应用到 Three.js 场景
+watch(
+  () => sceneStore.renderOptions,
+  (opts) => {
+    three.setAxesVisible(opts.showAxes)
+    three.setWaypointColor(opts.waypointColor)
+    three.setTrajectoryColor(opts.trajectoryColor)
+    three.setArrowColor(opts.arrowColor)
+    three.setArrowsVisible(opts.showArrows)
+  },
+  { deep: true, immediate: true }
+)
 </script>
 
 <template>
