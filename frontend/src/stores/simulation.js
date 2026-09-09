@@ -17,7 +17,8 @@ export const useSimulationStore = defineStore('simulation', {
     coverageModalVisible: false,
     // 仿真参数（与 ControlPanel 表单双向绑定）
     params: {
-      platform_type: 'UAV',
+      platform_id: 'copter_linearpath',
+      scanner_id: 'riegl_vux-1uav',
       speed: 5.0,
       altitude: 100.0,
       scan_freq: 10.0,

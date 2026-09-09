@@ -10,6 +10,16 @@ export function useHeliosAPI() {
     fd.append('file', file)
     return api.post('/models/upload', fd).then((r) => r.data)
   }
+  // 批量上传：各文件独立 POST，一个失败不影响其余；返回 {ok: [...], fail: [...]}
+  const uploadModels = async (files) => {
+    const results = await Promise.allSettled(files.map((f) => uploadModel(f)))
+    const ok = [], fail = []
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') ok.push(r.value)
+      else fail.push({ name: files[i].name, error: r.reason?.response?.data?.detail || r.reason?.message })
+    })
+    return { ok, fail }
+  }
   const listModels = () => api.get('/models').then((r) => r.data)
   const deleteModel = (id) => api.delete(`/models/${id}`).then((r) => r.data)
 
@@ -48,6 +58,7 @@ export function useHeliosAPI() {
 
   return {
     uploadModel,
+    uploadModels,
     listModels,
     deleteModel,
     generateTrajectory,

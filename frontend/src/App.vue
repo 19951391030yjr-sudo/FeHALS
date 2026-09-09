@@ -6,7 +6,7 @@ import { useSimulationStore } from './stores/simulation'
 import { useHeliosAPI, connectLogWS } from './composables/useHeliosAPI'
 import { useThreeScene } from './composables/useThreeScene'
 import { generateBowtie } from './composables/useBowtie'
-import { getParams } from './composables/scannerSpecs'
+import { getPlatform, getScanner } from './composables/scannerSpecs'
 import Scene3D from './components/Scene3D.vue'
 import ControlPanel from './components/ControlPanel.vue'
 import WaypointList from './components/WaypointList.vue'
@@ -78,16 +78,31 @@ function onPickModel() {
 }
 
 async function onFileChange(e) {
-  const file = e.target.files && e.target.files[0]
+  const files = [...(e.target.files || [])] // 立即转数组，绕过 FileList 的 live collection 特性
   e.target.value = ''
-  if (!file) return
-  simStore.addLog('INFO', `开始上传模型：${file.name}`)
-  try {
-    const res = await api.uploadModel(file)
-    sceneStore.addModel({ id: res.model_id, name: res.filename, url: res.url, up: res.up || 'z' })
-    simStore.addLog('INFO', `模型上传完成：${res.filename}`)
-  } catch (err) {
-    simStore.addLog('ERROR', '模型上传失败：' + (err.response?.data?.detail || err.message))
+  if (!files.length) return
+  if (files.length === 1) {
+    // 单文件上传（保持原有行为）
+    const file = files[0]
+    simStore.addLog('INFO', `开始上传模型：${file.name}`)
+    try {
+      const res = await api.uploadModel(file)
+      sceneStore.addModel({ id: res.model_id, name: res.filename, url: res.url, up: res.up || 'z' })
+      simStore.addLog('INFO', `模型上传完成：${res.filename}`)
+    } catch (err) {
+      simStore.addLog('ERROR', '模型上传失败：' + (err.response?.data?.detail || err.message))
+    }
+  } else {
+    // 批量上传
+    simStore.addLog('INFO', `开始批量上传 ${files.length} 个模型...`)
+    const { ok, fail } = await api.uploadModels(files)
+    sceneStore.addModels(ok.map((r) => ({ id: r.model_id, name: r.filename, url: r.url, up: r.up || 'z' })))
+    if (fail.length === 0) {
+      simStore.addLog('INFO', `批量上传完成：${ok.length} 个模型`)
+    } else {
+      simStore.addLog('WARNING', `上传完成：${ok.length} 个成功，${fail.length} 个失败`)
+      fail.forEach((f) => simStore.addLog('ERROR', `「${f.name}」上传失败：${f.error}`))
+    }
   }
 }
 
@@ -133,9 +148,9 @@ async function runSimulation() {
     simStore.addLog('WARNING', '已有仿真任务正在运行')
     return
   }
-  const minAlt = getParams(simStore.params.platform_type).scanner.params.rangeMin.default
+  const minAlt = getScanner(simStore.params.scanner_id).params.rangeMin.default
   if (simStore.params.altitude < minAlt) {
-    simStore.addLog('ERROR', `飞行高度 ${simStore.params.altitude}m 低于 ${simStore.params.platform_type} 平台最小测程 ${minAlt}m，请调高航高或改用 UAV 平台`)
+    simStore.addLog('ERROR', `飞行高度 ${simStore.params.altitude}m 低于扫描器最小测程 ${minAlt}m，请调高航高或改用更远测程的扫描器`)
     return
   }
   if (!waypointStore.count) {
@@ -143,8 +158,9 @@ async function runSimulation() {
     return
   }
   // 参数范围校验
-  const specs = getParams(simStore.params.platform_type)
-  const allSpecs = { ...specs.platform.params, ...specs.scanner.params }
+  const plat = getPlatform(simStore.params.platform_id)
+  const sc = getScanner(simStore.params.scanner_id)
+  const allSpecs = { ...plat.params, ...sc.params }
   for (const [key, spec] of Object.entries(allSpecs)) {
     if (spec.readonly) continue
     const val = simStore.params[key]
@@ -166,7 +182,9 @@ async function runSimulation() {
     const run = await api.runSimulation({
       trajectory_id: traj.file_id,
       config_id: cfg.config_id,
-      scene_model_id: sceneStore.activeModelId || null,
+      scene_model_ids: sceneStore.models
+        .filter((m) => /\.obj$/i.test(m.name))
+        .map((m) => m.id) || null,
     })
     simStore.taskId = run.task_id
     simStore.status = 'running'
@@ -238,6 +256,7 @@ async function loadResult() {
               <input ref="fileInput"
                      type="file"
                      accept=".obj,.gltf,.glb,.stl"
+                     multiple
                      style="display: none"
                      @change="onFileChange" />
               <button class="btn" @click="onPickModel">模型上传</button>

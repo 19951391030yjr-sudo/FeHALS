@@ -14,15 +14,22 @@ from typing import Optional, Tuple
 
 from app.config import CONFIGS_DIR
 
-# 平台类型 → HELIOS++ 平台目录项（均为 linearpath 型，配合 interpolated 运动模型）
-PLATFORM_MAP = {
-    "UAV": "copter_linearpath",
-    "Airborne": "copter_linearpath",
-}
-
-SCANNER_MAP = {
-    "UAV": ("scanners_als.xml", "riegl_vux-1uav"),
-    "Airborne": ("scanners_als.xml", "riegl_vux-1uav"),
+# 扫描器 ID → (XML 文件名, HELIOS++ 引用 ID)
+# 数据源：3rd/helios/python/pyhelios/data/{scanners_als,scanners_tls}.xml
+SCANNER_FILE_MAP = {
+    # ALS 扫描仪
+    "riegl_vux-1uav": ("scanners_als.xml", "riegl_vux-1uav"),
+    "riegl_vq_780i": ("scanners_als.xml", "riegl_vq_780i"),
+    "riegl_vq-1560i": ("scanners_als.xml", "riegl_vq-1560i"),
+    "leica_als50": ("scanners_als.xml", "leica_als50"),
+    "riegl_lms-q780": ("scanners_als.xml", "riegl_lms-q780"),
+    "optech_galaxy": ("scanners_als.xml", "optech_galaxy"),
+    "dji-zenmuse-l2-repetitive": ("scanners_als.xml", "dji-zenmuse-l2-repetitive"),
+    # TLS/MLS 扫描仪
+    "vlp16": ("scanners_tls.xml", "vlp16"),
+    "velodyne_hdl-64e": ("scanners_tls.xml", "velodyne_hdl-64e"),
+    "riegl_vz400": ("scanners_tls.xml", "riegl_vz400"),
+    "livox-avia-non-repetitive": ("scanners_tls.xml", "livox-avia-non-repetitive"),
 }
 
 # 无模型时的默认地面场景（通过 --assets 仓库根目录解析）
@@ -82,30 +89,40 @@ def detect_up_axis(obj_path: str) -> str:
     return "y" if up_idx == 1 else "z"
 
 
-def generate_scene_xml(model_path: Optional[str], up: str = "z") -> Tuple[Path, str]:
+def generate_scene_xml(
+    model_paths: Optional[list[tuple[str, str]]] = None
+) -> Tuple[Path, str]:
     """生成场景 XML，返回 (xml 路径, scene_id)。
 
-    model_path 为绝对路径时加载用户上传的 OBJ 模型（objloader 的 up 参数用于
-    指示模型 up 轴，HELIOS++ 会把 'y' 旋转为 Z-up）；为 None 时使用默认地面平面。
+    model_paths 为 [(路径, up_轴), ...]，每个元组在场景中生成一个独立的 <part>。
+    为 None 或空列表时使用默认地面平面。
     """
     scene_id = f"fehals_scene_{int(time.time() * 1000)}"
-    if model_path:
-        filepath = model_path  # 绝对路径，objloader 直接打开
+    parts = []
+    if model_paths:
+        for p, up in model_paths:
+            up_line = f'                <param type="string" key="up" value="{up}" />\n'
+            parts.append(
+                "        <part>\n"
+                '            <filter type="objloader">\n'
+                f'                <param type="string" key="filepath" value="{_esc(p)}" />\n'
+                f"{up_line}"
+                "            </filter>\n"
+                "        </part>\n"
+            )
     else:
-        filepath = _DEFAULT_GROUNDPLANE  # 相对路径，经 --assets 解析
-        up = "z"
-
-    up_param = f'                <param type="string" key="up" value="{up}" />\n' if model_path else ""
+        parts.append(
+            "        <part>\n"
+            '            <filter type="objloader">\n'
+            f'                <param type="string" key="filepath" value="{_DEFAULT_GROUNDPLANE}" />\n'
+            "            </filter>\n"
+            "        </part>\n"
+        )
     content = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         "<document>\n"
         f'    <scene id="{scene_id}" name="{scene_id}">\n'
-        "        <part>\n"
-        '            <filter type="objloader">\n'
-        f'                <param type="string" key="filepath" value="{_esc(filepath)}" />\n'
-        f"{up_param}"
-        "            </filter>\n"
-        "        </part>\n"
+        f'{"".join(parts)}'
         "    </scene>\n"
         "</document>\n"
     )
@@ -121,9 +138,11 @@ def generate_survey_xml(
     params: dict,
 ) -> Path:
     """生成 survey XML，返回其路径。"""
-    platform_type = params.get("platform_type", "UAV")
-    platform_id = PLATFORM_MAP.get(platform_type, "copter_linearpath")
-    scanner_file, scanner_id = SCANNER_MAP.get(platform_type, ("scanners_als.xml", "riegl_vq-780i"))
+    platform_id = params.get("platform_id", "copter_linearpath")
+    scanner_id = params.get("scanner_id", "riegl_vux-1uav")
+    scanner_file, scanner_id_ref = SCANNER_FILE_MAP.get(
+        scanner_id, ("scanners_als.xml", "riegl_vux-1uav")
+    )
 
     # 参数映射：脉冲频率 kHz -> Hz；±半角 -> 总扫描角
     pulse_hz = float(params.get("pulse_freq", 50.0)) * 1000.0
@@ -140,7 +159,7 @@ def generate_survey_xml(
         f'            scene="{_esc(scene_xml_path)}#{scene_id}"\n'
         '            platform="interpolated"\n'
         f'            basePlatform="data/platforms.xml#{platform_id}"\n'
-        f'            scanner="data/{scanner_file}#{scanner_id}">\n'
+        f'            scanner="data/{scanner_file}#{scanner_id_ref}">\n'
         "        <leg>\n"
         "            <platformSettings\n"
         f'                trajectory="{_esc(traj_path)}"\n'
