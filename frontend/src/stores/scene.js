@@ -22,6 +22,9 @@ export const useSceneStore = defineStore('scene', {
       })
       this.activeModelId = m.id
     },
+    addModels(models) {
+      models.forEach((m) => this.addModel(m))
+    },
     removeModel(id) {
       this.models = this.models.filter((m) => m.id !== id)
       if (this.activeModelId === id) this.activeModelId = this.models.length > 0 ? this.models[this.models.length - 1].id : null

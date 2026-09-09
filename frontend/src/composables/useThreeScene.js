@@ -61,6 +61,8 @@ function createThreeScene() {
     rectPointCallback: null,
     _downX: 0,
     _downY: 0,
+    // 自适应网格
+    _lastGridDist: -1,
   }
 
   const WAYPOINT_COLOR = 0xff4444
@@ -95,7 +97,7 @@ function createThreeScene() {
     state.scene.add(dir)
 
     // 网格与（不可见）地面拾取平面（Z-up：地面为 z=0 的 XY 平面）
-    state.grid = new THREE.GridHelper(200, 200, 0x999999, 0xd0d0d0)
+    state.grid = new THREE.GridHelper(500, 100, 0x999999, 0xd0d0d0)
     state.grid.rotation.x = Math.PI / 2 // GridHelper 默认在 XZ 平面，转到 XY 平面
     state.scene.add(state.grid)
     state.groundPlane = new THREE.Mesh(
@@ -154,6 +156,7 @@ function createThreeScene() {
   function animate() {
     state.animationId = requestAnimationFrame(animate)
     state.controls.update()
+    updateGrid()
     state.renderer.render(state.scene, state.camera)
   }
 
@@ -164,6 +167,27 @@ function createThreeScene() {
     state.camera.aspect = w / h
     state.camera.updateProjectionMatrix()
     state.renderer.setSize(w, h)
+  }
+
+  // ---------------------------- 自适应网格 ----------------------------
+
+  function updateGrid() {
+    if (!state.controls || !state.grid) return
+    const target = state.controls.target
+    const dist = state.camera.position.distanceTo(target)
+    // 量化距离，避免每帧重建几何体
+    const gridDist = Math.max(1, Math.round(dist / 10) * 10)
+    if (gridDist !== state._lastGridDist) {
+      state._lastGridDist = gridDist
+      const size = Math.max(30, dist * 2.5)
+      const divisions = Math.max(10, Math.min(150, Math.round(size / 2)))
+      state.scene.remove(state.grid)
+      state.grid = new THREE.GridHelper(size, divisions, 0x999999, 0xd0d0d0)
+      state.grid.rotation.x = Math.PI / 2 // Z-up
+      state.scene.add(state.grid)
+    }
+    // 网格跟随视图中心（投影在 z=0 平面）
+    state.grid.position.set(target.x, target.y, 0)
   }
 
   // ---------------------------- 拾取 ----------------------------

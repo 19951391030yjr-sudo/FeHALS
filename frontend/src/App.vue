@@ -77,16 +77,31 @@ function onPickModel() {
 }
 
 async function onFileChange(e) {
-  const file = e.target.files && e.target.files[0]
+  const files = [...(e.target.files || [])] // 立即转数组，绕过 FileList 的 live collection 特性
   e.target.value = ''
-  if (!file) return
-  simStore.addLog('INFO', `开始上传模型：${file.name}`)
-  try {
-    const res = await api.uploadModel(file)
-    sceneStore.addModel({ id: res.model_id, name: res.filename, url: res.url, up: res.up || 'z' })
-    simStore.addLog('INFO', `模型上传完成：${res.filename}`)
-  } catch (err) {
-    simStore.addLog('ERROR', '模型上传失败：' + (err.response?.data?.detail || err.message))
+  if (!files.length) return
+  if (files.length === 1) {
+    // 单文件上传（保持原有行为）
+    const file = files[0]
+    simStore.addLog('INFO', `开始上传模型：${file.name}`)
+    try {
+      const res = await api.uploadModel(file)
+      sceneStore.addModel({ id: res.model_id, name: res.filename, url: res.url, up: res.up || 'z' })
+      simStore.addLog('INFO', `模型上传完成：${res.filename}`)
+    } catch (err) {
+      simStore.addLog('ERROR', '模型上传失败：' + (err.response?.data?.detail || err.message))
+    }
+  } else {
+    // 批量上传
+    simStore.addLog('INFO', `开始批量上传 ${files.length} 个模型...`)
+    const { ok, fail } = await api.uploadModels(files)
+    sceneStore.addModels(ok.map((r) => ({ id: r.model_id, name: r.filename, url: r.url, up: r.up || 'z' })))
+    if (fail.length === 0) {
+      simStore.addLog('INFO', `批量上传完成：${ok.length} 个模型`)
+    } else {
+      simStore.addLog('WARNING', `上传完成：${ok.length} 个成功，${fail.length} 个失败`)
+      fail.forEach((f) => simStore.addLog('ERROR', `「${f.name}」上传失败：${f.error}`))
+    }
   }
 }
 
@@ -237,6 +252,7 @@ async function loadResult() {
               <input ref="fileInput"
                      type="file"
                      accept=".obj,.gltf,.glb,.stl"
+                     multiple
                      style="display: none"
                      @change="onFileChange" />
               <button class="btn" @click="onPickModel">模型上传</button>
