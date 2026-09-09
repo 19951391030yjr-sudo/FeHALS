@@ -17,9 +17,18 @@ from app.config import CONFIGS_DIR
 # 扫描器 ID → (XML 文件名, HELIOS++ 引用 ID)
 # 数据源：3rd/helios/python/pyhelios/data/{scanners_als,scanners_tls}.xml
 SCANNER_FILE_MAP = {
+    # ALS 扫描仪
     "riegl_vux-1uav": ("scanners_als.xml", "riegl_vux-1uav"),
     "riegl_vq_780i": ("scanners_als.xml", "riegl_vq_780i"),
+    "riegl_vq-1560i": ("scanners_als.xml", "riegl_vq-1560i"),
+    "leica_als50": ("scanners_als.xml", "leica_als50"),
+    "riegl_lms-q780": ("scanners_als.xml", "riegl_lms-q780"),
+    "optech_galaxy": ("scanners_als.xml", "optech_galaxy"),
+    "dji-zenmuse-l2-repetitive": ("scanners_als.xml", "dji-zenmuse-l2-repetitive"),
+    # TLS/MLS 扫描仪
     "vlp16": ("scanners_tls.xml", "vlp16"),
+    "velodyne_hdl-64e": ("scanners_tls.xml", "velodyne_hdl-64e"),
+    "riegl_vz400": ("scanners_tls.xml", "riegl_vz400"),
     "livox-avia-non-repetitive": ("scanners_tls.xml", "livox-avia-non-repetitive"),
 }
 
