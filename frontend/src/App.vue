@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useSceneStore } from './stores/scene'
 import { useWaypointStore } from './stores/waypoints'
 import { useSimulationStore } from './stores/simulation'
+import { useScreenshotStore } from './stores/screenshot'
 import { useHeliosAPI, connectLogWS } from './composables/useHeliosAPI'
 import { useThreeScene } from './composables/useThreeScene'
 import { generateBowtie } from './composables/useBowtie'
@@ -21,6 +22,7 @@ import CoverageHeatmap from './components/CoverageHeatmap.vue'
 const sceneStore = useSceneStore()
 const waypointStore = useWaypointStore()
 const simStore = useSimulationStore()
+const screenshotStore = useScreenshotStore()
 const api = useHeliosAPI()
 const three = useThreeScene()
 
@@ -245,6 +247,107 @@ async function loadResult() {
     simStore.addLog('ERROR', '结果加载失败：' + (err.response?.data?.detail || err.message))
   }
 }
+
+// 截图功能
+async function takeScreenshot() {
+  // 获取Three.js画布
+  const canvas = three.renderer.domElement
+  const renderer = three.renderer
+
+  // 渲染场景（如果尚未渲染）
+  renderer.render(three.scene, three.camera)
+
+  // 获取截图设置
+  const settings = screenshotStore.settings
+
+  // 创建输出画布
+  const outputCanvas = document.createElement('canvas')
+  const outputCtx = outputCanvas.getContext('2d')
+
+  // 设置画布尺寸
+  if (settings.customDimensions) {
+    outputCanvas.width = settings.width
+    outputCanvas.height = settings.height
+  } else {
+    outputCanvas.width = canvas.width
+    outputCanvas.height = canvas.height
+  }
+
+  // 绘制视口内容
+  outputCtx.drawImage(canvas, 0, 0, outputCanvas.width, outputCanvas.height)
+
+  // 如果启用，添加参数叠加
+  if (settings.showParameters) {
+    addParameterOverlay(outputCtx, simStore.params, settings.overlayPosition, outputCanvas.width, outputCanvas.height)
+  }
+
+  // 下载图片
+  const link = document.createElement('a')
+  const timestamp = new Date().toLocaleString('zh-CN').replace(/[/:]/g, '-')
+  link.download = `fehals_截图_${timestamp}.png`
+  link.href = outputCanvas.toDataURL('image/png', settings.quality)
+  link.click()
+
+  simStore.addLog('INFO', '截图已保存')
+}
+
+function addParameterOverlay(ctx, params, position, canvasWidth, canvasHeight) {
+  const platform = getPlatform(params.platform_id)
+  const scanner = getScanner(params.scanner_id)
+
+  // 创建参数文本
+  const text = [
+    `平台: ${platform.label} (${params.platform_id})`,
+    `扫描器: ${scanner.label} (${params.scanner_id})`,
+    `速度: ${params.speed} m/s`,
+    `高度: ${params.altitude} m`,
+    `扫描频率: ${params.scan_freq} Hz`,
+    `扫描角度: ${params.scan_angle}°`,
+    `脉冲频率: ${params.pulse_freq} kHz`,
+    `输出格式: ${params.output_format}`,
+  ].join('\n')
+
+  // 设置文本属性
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
+  ctx.font = '12px monospace'
+
+  // 计算文本尺寸
+  const lines = text.split('\n')
+  const lineHeight = 16
+  const padding = 10
+  const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width))
+
+  // 绘制背景
+  const overlayWidth = maxWidth + padding * 2
+  const overlayHeight = lines.length * lineHeight + padding * 2
+
+  let x, y
+  switch (position) {
+    case 'top-left':
+      x = padding
+      y = padding
+      break
+    case 'top-right':
+      x = canvasWidth - overlayWidth - padding
+      y = padding
+      break
+    case 'bottom-right':
+      x = canvasWidth - overlayWidth - padding
+      y = canvasHeight - overlayHeight - padding
+      break
+    default: // bottom-left
+      x = padding
+      y = canvasHeight - overlayHeight - padding
+  }
+
+  ctx.fillRect(x, y, overlayWidth, overlayHeight)
+
+  // 绘制文本
+  ctx.fillStyle = 'white'
+  lines.forEach((line, index) => {
+    ctx.fillText(line, x + padding, y + padding + (index + 1) * lineHeight)
+  })
+}
 </script>
 
 <template>
@@ -261,6 +364,7 @@ async function loadResult() {
                      @change="onFileChange" />
               <button class="btn" @click="onPickModel">模型上传</button>
               <button class="btn" @click="exportTrajectory">导出航迹</button>
+              <button class="btn" @click="takeScreenshot">截图</button>
               <button class="btn btn-primary" @click="runSimulation" v-if="simStore.status !== 'running'">执行仿真</button>
               <button class="btn btn-danger" @click="cancelSimulation" v-if="simStore.status === 'running'">取消</button>
               <span class="status-badge" :class="'status-' + simStore.status">

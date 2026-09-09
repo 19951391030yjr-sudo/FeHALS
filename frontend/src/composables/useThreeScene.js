@@ -1,18 +1,18 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 
 // 高度着色渐变（蓝→青→绿→黄→红）
 // 3D 点云着色（本文件）与统计直方图（PointCloudPanel）共用
 export function heightColor(t) {
-  const stops = [[0,0,1],[0,1,1],[0,1,0],[1,1,0],[1,0,0]]
+  const stops = [[0, 0, 1], [0, 1, 1], [0, 1, 0], [1, 1, 0], [1, 0, 0]]
   const x = Math.max(0, Math.min(1, t)) * (stops.length - 1)
   const i = Math.min(Math.floor(x), stops.length - 2)
   const f = x - i
   const a = stops[i], b = stops[i + 1]
-  return [a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f, a[2]+(b[2]-a[2])*f]
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]
 }
 
 export function heightCssColor(t) {
@@ -67,11 +67,47 @@ function createThreeScene() {
     _downY: 0,
     // 自适应网格
     _lastGridDist: -1,
+    // 可配置渲染属性
+    waypointColor: '#00ffff',
+    waypointSelectColor: '#ffff00',
+    trajectoryColor: '#ff00ff',
+    arrowColor: '#ffff00',
+    waypointArrows: [],
+    axesGroup: null,
+    _lastScaleKey: -1,
+    _baseWpRadius: 0.3,
   }
 
-  const WAYPOINT_COLOR = 0xff4444
-  const WAYPOINT_SELECT_COLOR = 0xffff00
   const CLICK_MOVE_SQ = 25 // 点击 vs 拖动的位移阈值（像素²）
+
+  // ----- 加粗坐标轴箭头（Mesh 避免 WebGL linewidth 限制）-----
+
+  function makeAxisArrow(dir, color) {
+    const AXIS_LEN = 12
+    const SHAFT_RAD = 0.10
+    const HEAD_LEN = 1.2
+    const HEAD_RAD = 0.30
+
+    const group = new THREE.Group()
+    const dirVec = new THREE.Vector3(dir[0], dir[1], dir[2])
+    const shaftLen = AXIS_LEN - HEAD_LEN
+
+    const shaftGeo = new THREE.CylinderGeometry(SHAFT_RAD, SHAFT_RAD, shaftLen, 8)
+    const mat = new THREE.MeshBasicMaterial({ color })
+    const shaft = new THREE.Mesh(shaftGeo, mat)
+    shaft.position.set(0, shaftLen / 2, 0)
+    group.add(shaft)
+
+    const headGeo = new THREE.ConeGeometry(HEAD_RAD, HEAD_LEN, 12)
+    const head = new THREE.Mesh(headGeo, mat)
+    head.position.set(0, shaftLen + HEAD_LEN / 2, 0)
+    group.add(head)
+
+    // 从 +Y 朝向目标方向
+    const up = new THREE.Vector3(0, 1, 0)
+    group.quaternion.setFromUnitVectors(up, dirVec)
+    return group
+  }
 
   // ---------------------------- 初始化 ----------------------------
 
@@ -104,12 +140,25 @@ function createThreeScene() {
     state.grid = new THREE.GridHelper(500, 100, 0x999999, 0xd0d0d0)
     state.grid.rotation.x = Math.PI / 2 // GridHelper 默认在 XZ 平面，转到 XY 平面
     state.scene.add(state.grid)
+    // 加粗 XYZ 坐标轴（Mesh 而非 AxesHelper，避免过细被 grid 中心线覆盖）
+    state.axesGroup = new THREE.Group()
+      ;[
+        { dir: [1, 0, 0], color: 0xff0000, label: 'X' },
+        { dir: [0, 1, 0], color: 0x00ff00, label: 'Y' },
+        { dir: [0, 0, 1], color: 0x0000ff, label: 'Z' },
+      ].forEach(({ dir, color }) => {
+        const g = makeAxisArrow(dir, color)
+        state.axesGroup.add(g)
+      })
+    state.axesGroup.visible = false
+    state.scene.add(state.axesGroup)
     state.groundPlane = new THREE.Mesh(
       new THREE.PlaneGeometry(100000, 100000),
       new THREE.MeshBasicMaterial({ visible: false })
     )
     // PlaneGeometry 默认即 XY 平面（法向 +Z），无需旋转
     state.groundPlane.name = 'groundPlane'
+    state.groundPlane.position.set(0, 0, 0)
     state.scene.add(state.groundPlane)
 
     state.modelsGroup = new THREE.Group()
@@ -124,7 +173,7 @@ function createThreeScene() {
 
     state.waypointLine = new THREE.Line(
       new THREE.BufferGeometry(),
-      new THREE.LineBasicMaterial({ color: 0xffffff })
+      new THREE.LineBasicMaterial({ color: state.trajectoryColor })
     )
     state.waypointGroup.add(state.waypointLine)
 
@@ -213,6 +262,32 @@ function createThreeScene() {
     }
     // 网格跟随视图中心（投影在 z=0 平面）
     state.grid.position.set(target.x, target.y, 0)
+    // 地面平面也要跟随视图中心，以确保射线拾取与网格显示一致
+    state.groundPlane.position.set(target.x, target.y, 0)
+
+    // 坐标轴跟随网格中心，略抬升避免被 grid 线条遮挡
+    if (state.axesGroup) {
+      state.axesGroup.position.set(target.x, target.y, 0.05)
+    }
+
+    // 缩放航点、箭头和坐标轴以匹配相机距离
+    const scaleKey = Math.round(dist / 3)
+    if (scaleKey !== state._lastScaleKey) {
+      state._lastScaleKey = scaleKey
+      const sf = Math.max(0.3, dist * 0.06)
+      const sf_wps = sf / 2
+      const sf_wpa = sf / 1.5
+      const sf_axes = sf / 5
+      state.waypointSpheres.forEach((s) => {
+        s.mesh.scale.set(sf_wps, sf_wps, sf_wps)
+      })
+      state.waypointArrows.forEach((a) => {
+        a.scale.set(sf_wpa, sf_wpa, sf_wpa)
+      })
+      if (state.axesGroup) {
+        state.axesGroup.scale.set(sf_axes, sf_axes, sf_axes)
+      }
+    }
   }
 
   // ---------------------------- 拾取 ----------------------------
@@ -262,7 +337,7 @@ function createThreeScene() {
     const hits = raycastGround(e)
     if (hits.length) {
       const p = hits[0].point
-      state.dragTarget.mesh.position.set(p.x, p.y, 0)
+      state.dragTarget.mesh.position.set(p.x, p.y, 0.05)
       updateWaypointLine()
     }
   }
@@ -337,7 +412,7 @@ function createThreeScene() {
     state.selectedIndex = index
     state.waypointSpheres.forEach((s) => {
       s.mesh.material.color.set(
-        s.index === index ? WAYPOINT_SELECT_COLOR : WAYPOINT_COLOR
+        s.index === index ? state.waypointSelectColor : state.waypointColor
       )
     })
   }
@@ -357,11 +432,11 @@ function createThreeScene() {
     const geo = new THREE.SphereGeometry(0.3, 24, 24)
     points.forEach((p, i) => {
       const mat = new THREE.MeshStandardMaterial({
-        color: i === state.selectedIndex ? WAYPOINT_SELECT_COLOR : WAYPOINT_COLOR,
+        color: i === state.selectedIndex ? state.waypointSelectColor : state.waypointColor,
         roughness: 0.4,
       })
       const mesh = new THREE.Mesh(geo, mat)
-      mesh.position.set(p.x, p.y, 0)
+      mesh.position.set(p.x, p.y, 0.05)
       mesh.name = 'waypoint'
       state.waypointGroup.add(mesh)
       state.waypointSpheres.push({ mesh, index: i })
@@ -390,6 +465,26 @@ function createThreeScene() {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     geo.setDrawRange(0, positions.length / 3)
     geo.computeBoundingSphere()
+    updateWaypointArrows()
+  }
+
+  function updateWaypointArrows() {
+    // 清除旧箭头
+    state.waypointArrows.forEach((a) => state.waypointGroup.remove(a))
+    state.waypointArrows = []
+    if (!state.waypointSpheres || state.waypointSpheres.length < 2) return
+    for (let i = 0; i < state.waypointSpheres.length - 1; i++) {
+      const p1 = state.waypointSpheres[i].mesh.position
+      const p2 = state.waypointSpheres[i + 1].mesh.position
+      const dir = new THREE.Vector3().subVectors(p2, p1)
+      const len = dir.length()
+      if (len < 0.01) continue
+      dir.normalize()
+      const arrowLen = Math.min(len * 0.3, 2)
+      const arrow = new THREE.ArrowHelper(dir, p1, arrowLen, state.arrowColor, arrowLen * 0.4, arrowLen * 0.2)
+      state.waypointGroup.add(arrow)
+      state.waypointArrows.push(arrow)
+    }
   }
 
   // ---------------------------- 模型 ----------------------------
@@ -436,8 +531,8 @@ function createThreeScene() {
         const size = box.isEmpty()
           ? [0, 0, 0]
           : [Number((box.max.x - box.min.x).toFixed(2)),
-             Number((box.max.y - box.min.y).toFixed(2)),
-             Number((box.max.z - box.min.z).toFixed(2))]
+          Number((box.max.y - box.min.y).toFixed(2)),
+          Number((box.max.z - box.min.z).toFixed(2))]
         resolve({ root, size })
       }
       loader.load(url, onLoaded, undefined, reject)
@@ -451,11 +546,11 @@ function createThreeScene() {
     state.modelsGroup.remove(root)
     disposeObject(root)
     delete state.modelRoots[id]
-    // 清除 bbox + label
-    ;[id, id + '_label'].forEach((k) => {
-      const h = state.bboxHelpers[k]
-      if (h) { state.scene.remove(h); delete state.bboxHelpers[k] }
-    })
+      // 清除 bbox + label
+      ;[id, id + '_label'].forEach((k) => {
+        const h = state.bboxHelpers[k]
+        if (h) { state.scene.remove(h); delete state.bboxHelpers[k] }
+      })
     refreshModelMeshes()
   }
 
@@ -670,6 +765,37 @@ function createThreeScene() {
     return colors
   }
 
+  // ---------------------------- 渲染选项 ----------------------------
+
+  function setAxesVisible(visible) {
+    if (state.axesGroup) state.axesGroup.visible = visible
+  }
+
+  function setWaypointColor(color) {
+    state.waypointColor = color
+    state.waypointSpheres.forEach((s) => {
+      if (s.index !== state.selectedIndex) {
+        s.mesh.material.color.set(color)
+      }
+    })
+  }
+
+  function setTrajectoryColor(color) {
+    state.trajectoryColor = color
+    if (state.waypointLine) {
+      state.waypointLine.material.color.set(color)
+    }
+  }
+
+  function setArrowColor(color) {
+    state.arrowColor = color
+    state.waypointArrows.forEach((a) => a.setColor(color))
+  }
+
+  function setArrowsVisible(visible) {
+    state.waypointArrows.forEach((a) => { a.visible = visible })
+  }
+
   return {
     init, dispose,
     loadModel, removeModel, clearModels,
@@ -680,9 +806,15 @@ function createThreeScene() {
     setPickMode,
     onFrame, offFrame,
     getSceneMaxZ,
+    get renderer() { return state.renderer },
     get scene() { return state.scene },
     get camera() { return state.camera },
     get controls() { return state.controls },
     get animGroup() { return state.animGroup },
+    setAxesVisible,
+    setWaypointColor,
+    setTrajectoryColor,
+    setArrowColor,
+    setArrowsVisible,
   }
 }

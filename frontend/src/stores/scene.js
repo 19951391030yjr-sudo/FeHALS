@@ -13,6 +13,13 @@ export const useSceneStore = defineStore('scene', {
       opacity: 1.0,
       fixedColor: '#ffffff',
     },
+    renderOptions: {
+      showAxes: false,
+      waypointColor: '#00ffff',
+      trajectoryColor: '#ff00ff',
+      arrowColor: '#ffff00',
+      showArrows: true,
+    },
   }),
   actions: {
     addModel(m) {
