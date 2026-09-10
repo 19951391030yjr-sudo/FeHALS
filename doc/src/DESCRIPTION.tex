@@ -28,6 +28,7 @@
 \usepackage[ruled,vlined]{algorithm2e}
 \usepackage{etoolbox}
 \usepackage{placeins}
+\usepackage{subcaption}
 
 % \newcounter{stage}
 % \setcounter{stage}{0}
@@ -279,7 +280,7 @@ helios\_service.py维护仿真任务注册表，通过asyncio.create\_subprocess
 
 \begin{figure}[pos=!htbp]
     \centering
-    \includegraphics[width=\textwidth]{figs/gitgraph.pdf}
+    \includegraphics[width=\textwidth, height=0.9\textheight, keepaspectratio]{figs/gitgraph.pdf}
     \caption{基于git历史的详细贡献图，用户名的对应关系见首页脚注}
 \end{figure}
 
@@ -287,11 +288,71 @@ helios\_service.py维护仿真任务注册表，通过asyncio.create\_subprocess
 
 \section{FeHALS示例工作流}
 
-\subsection{模型导入}
-\subsection{仿真参数}
-\subsection{航迹绘制}
-\subsection{仿真执行}
-\subsection{点云导出}
+\begin{figure}[pos=!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figs/fehals_layout_desc.jpg}
+    \caption{FeHALS主页面，其中1为工具条，2为3D主视口，3为菜单栏，4为日志输出}
+\end{figure}
+
+\begin{figure}[pos=!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figs/import_model.jpg}
+    \caption{模型导入，FeHALS可以拖动、缩放模型，并显示模型bbox}
+\end{figure}
+
+\begin{figure}[pos=!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figs/edit_trajectory.jpg}
+    \caption{航迹绘制}
+\end{figure}
+
+\begin{figure}[pos=!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figs/param_setup.jpg}
+    \caption{仿真参数，主要包含平台和传感器参数}
+\end{figure}
+
+\begin{figure}[pos=!htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figs/pointcloud_overview_uav_riegl-vux-1.jpg}
+        \caption{UAV + RIEGL VUX}
+    \end{subfigure}
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figs/pointcloud_overview_sr22_dji.jpg}
+        \caption{SR22 + DJI ZENMUSE L2}
+    \end{subfigure}
+    \caption{不同参数设置的点云总览}
+\end{figure}
+
+\begin{figure}[pos=!htbp]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figs/pointcloud_detail_uav_riegl-vux-1.png}
+        \caption{UAV + RIEGL VUX}
+    \end{subfigure}
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figs/pointcloud_detail_sr22_dji.png}
+        \caption{SR22 + DJI ZENMUSE L2}
+    \end{subfigure}
+    \caption{不同参数设置的点云细节}
+\end{figure}
+
+\begin{figure}[pos=!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figs/perpoint_palyback.jpg}
+    \caption{逐点仿真回放，也可以选择逐航段}
+\end{figure}
+
+\begin{figure}[pos=!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figs/export_cloudcompare.jpg}
+    \caption{导出点云，在CloudCompare \citep{cloudcompare} 中渲染}
+\end{figure}
 
 \FloatBarrier
 \newpage
